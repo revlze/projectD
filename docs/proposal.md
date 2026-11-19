@@ -107,3 +107,10 @@ sequenceDiagram
 
 **Внешний вклад**. Основной вариант - проведение внешних испытаний в AgentBeats с совместимым оценщиком. Запасной - pull request в TLA⁺ Examples с моделями небезопасного и атомарного списания, конфигурациями TLC и воспроизводимыми результатами проверки. 
 
+
+## 7. Связанные работы
+
+1. **Hasan, BusiReddyGari (2026).** [*DPBench: Large Language Models Struggle with Simultaneous Coordination*](https://arxiv.org/abs/2602.13255). Исследует различия между последовательной и одновременной координацией LLM при конкуренции за ресурсы, включая влияние коммуникации.
+2. **Paliskara, Namchittai, Lampinen (2026).** [*Worse Together: How Performance Breaks Down in Multi-User Multi-Agent Teams*](https://arxiv.org/abs/2610.00583). Рассматривает независимых агентов с общими ресурсами, в том числе вычислительным бюджетом; мотивирует оценку общей полезности наряду с координацией.
+3. **Lyu et al. (2026).** [*CoAgent: Concurrency Control for Multi-Agent Systems*](https://arxiv.org/abs/2606.15376). Рассматривает механизмы управления конкурентным доступом в агентных системах и компромисс между согласованностью и стоимостью синхронизации.
+4. **Khan (2026).** [*Verified Detection and Prevention of Concurrency Anomalies in Multi-Agent Large Language Model Systems*](https://arxiv.org/abs/2606.17182). Пример формализации нарушений согласованности в TLA⁺ и проверки контрпримеров с помощью TLC.
