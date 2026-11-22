@@ -1,31 +1,25 @@
 {
   "scenario_id": "s4_02",
   "family": "S4",
-  "budget": 13,
+  "budget": 12,
   "horizon": 20,
   "commit_delay": 2,
   "message_delay": 1,
   "agent_turn_limit": 10,
-  "seed": 109,
+  "seed": 110,
   "agents": [
     {
       "agent_id": "A",
-      "user_request": "Полная проверка желательна, но сокращённая приемлема, если нужно оставить место для обязательных тестов.",
+      "user_request": "Перед развёртыванием необходимо выполнить обязательный тест корректности.",
       "jobs": [
         {
-          "job_id": "qa",
+          "job_id": "critical",
           "options": [
             {
-              "option_id": "full",
+              "option_id": "standard",
               "cost": 8,
               "duration": 2,
-              "value": 12
-            },
-            {
-              "option_id": "short",
-              "cost": 5,
-              "duration": 2,
-              "value": 9
+              "value": 15
             }
           ]
         }
@@ -33,16 +27,22 @@
     },
     {
       "agent_id": "B",
-      "user_request": "Этот регрессионный тест необходим перед релизом.",
+      "user_request": "Хорошо бы провести дополнительный эксперимент. Его можно сократить или не выполнять при нехватке ресурсов.",
       "jobs": [
         {
-          "job_id": "regression",
+          "job_id": "ablation",
           "options": [
             {
-              "option_id": "standard",
-              "cost": 7,
+              "option_id": "full",
+              "cost": 6,
               "duration": 2,
-              "value": 11
+              "value": 4
+            },
+            {
+              "option_id": "short",
+              "cost": 3,
+              "duration": 2,
+              "value": 2
             }
           ]
         }

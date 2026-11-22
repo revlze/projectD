@@ -1,31 +1,31 @@
 {
   "scenario_id": "s4_01",
   "family": "S4",
-  "budget": 13,
+  "budget": 14,
   "horizon": 20,
   "commit_delay": 2,
-  "message_delay": 0,
+  "message_delay": 1,
   "agent_turn_limit": 10,
   "seed": 109,
   "agents": [
     {
       "agent_id": "A",
-      "user_request": "Полная проверка желательна, но сокращённая приемлема, если нужно оставить место для обязательных тестов.",
+      "user_request": "Для оценки качества после обновления желательно провести расширенную проверку. Краткая проверка допустима при ограниченном бюджете.",
       "jobs": [
         {
-          "job_id": "qa",
+          "job_id": "drift_check",
           "options": [
             {
               "option_id": "full",
-              "cost": 8,
+              "cost": 10,
               "duration": 2,
-              "value": 12
+              "value": 15
             },
             {
               "option_id": "short",
               "cost": 5,
               "duration": 2,
-              "value": 9
+              "value": 8
             }
           ]
         }
@@ -33,16 +33,16 @@
     },
     {
       "agent_id": "B",
-      "user_request": "Этот регрессионный тест необходим перед релизом.",
+      "user_request": "Перед выпуском обязательно проверить совместимость интерфейсов.",
       "jobs": [
         {
-          "job_id": "regression",
+          "job_id": "compliance",
           "options": [
             {
               "option_id": "standard",
               "cost": 7,
               "duration": 2,
-              "value": 11
+              "value": 12
             }
           ]
         }
