@@ -1,0 +1,46 @@
+{
+  "scenario_id": "s0_03",
+  "family": "S0",
+  "budget": 12,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 45,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Подготовь базовые метрики модели.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 5,
+              "duration": 2,
+              "value": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Проверь исправления перед выпуском.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 6,
+              "duration": 2,
+              "value": 10
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

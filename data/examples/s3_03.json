@@ -1,0 +1,52 @@
+{
+  "scenario_id": "s3_03",
+  "family": "S3",
+  "budget": 15,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 45,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Без этой проверки нельзя передавать результаты заказчику.",
+      "jobs": [
+        {
+          "job_id": "critical",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 9,
+              "duration": 2,
+              "value": 17
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Дополнительный эксперимент по возможности; полная версия не обязательна.",
+      "jobs": [
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 8,
+              "duration": 2,
+              "value": 5
+            },
+            {
+              "option_id": "short",
+              "cost": 4,
+              "duration": 2,
+              "value": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

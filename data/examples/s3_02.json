@@ -1,0 +1,52 @@
+{
+  "scenario_id": "s3_02",
+  "family": "S3",
+  "budget": 10,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 44,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "В первую очередь заверши обязательный тест корректности.",
+      "jobs": [
+        {
+          "job_id": "critical",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 6,
+              "duration": 2,
+              "value": 14
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Дополнительная проверка гипотез полезна, но не обязательна. Допускается короткая версия.",
+      "jobs": [
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 5,
+              "duration": 2,
+              "value": 4
+            },
+            {
+              "option_id": "short",
+              "cost": 2,
+              "duration": 2,
+              "value": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

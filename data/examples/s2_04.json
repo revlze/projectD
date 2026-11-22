@@ -1,0 +1,52 @@
+{
+  "scenario_id": "s2_04",
+  "family": "S2",
+  "budget": 13,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 48,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Полная проверка желательна, но сокращённая приемлема, если нужно оставить место для обязательных тестов.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 8,
+              "duration": 2,
+              "value": 12
+            },
+            {
+              "option_id": "short",
+              "cost": 5,
+              "duration": 2,
+              "value": 9
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Этот регрессионный тест необходим перед релизом.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 7,
+              "duration": 2,
+              "value": 11
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

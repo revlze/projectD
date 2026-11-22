@@ -1,0 +1,46 @@
+{
+  "scenario_id": "s1_03",
+  "family": "S1",
+  "budget": 15,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 45,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прогони важную расширенную проверку качества.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 9,
+              "duration": 2,
+              "value": 14
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Нужна обязательная проверка совместимости.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 8,
+              "duration": 2,
+              "value": 13
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "scenario_id": "s3_04",
+  "family": "S3",
+  "budget": 14,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 48,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Без обязательной проверки качества продукт выпускать нельзя.",
+      "jobs": [
+        {
+          "job_id": "critical",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 8,
+              "duration": 2,
+              "value": 16
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "При возможности сделай дополнительное исследование, короткая версия тоже пригодится.",
+      "jobs": [
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 7,
+              "duration": 2,
+              "value": 5
+            },
+            {
+              "option_id": "short",
+              "cost": 4,
+              "duration": 2,
+              "value": 3
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "scenario_id": "s4_pilot",
+  "family": "S4",
+  "budget": 12,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 109,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "К обсуждению нужна проверка модели. Полная предпочтительна, но сокращённой достаточно, если нужно оставить ресурс на обязательные тесты.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 7,
+              "duration": 2,
+              "value": 10
+            },
+            {
+              "option_id": "short",
+              "cost": 4,
+              "duration": 2,
+              "value": 8
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Перед выпуском обязательно выполни регрессионный тест.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 6,
+              "duration": 2,
+              "value": 11
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

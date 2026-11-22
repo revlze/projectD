@@ -1,0 +1,46 @@
+{
+  "scenario_id": "s1_04",
+  "family": "S1",
+  "budget": 11,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 48,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "К отчёту требуется подробная проверка.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 7,
+              "duration": 2,
+              "value": 12
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Тест регрессий обязателен перед публикацией.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 5,
+              "duration": 2,
+              "value": 10
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

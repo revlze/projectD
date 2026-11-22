@@ -1,0 +1,46 @@
+{
+  "scenario_id": "s0_04",
+  "family": "S0",
+  "budget": 20,
+  "horizon": 20,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 10,
+  "seed": 48,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Нужно выполнить основную проверку результатов.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 9,
+              "duration": 2,
+              "value": 14
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Проведи проверку исправлений перед релизом.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "standard",
+              "cost": 10,
+              "duration": 2,
+              "value": 16
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
