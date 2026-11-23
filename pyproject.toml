@@ -27,3 +27,8 @@ src = ["src", "tests"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Agent prompts and tool descriptions are in Russian, so Cyrillic is intentional there.
+"src/project_d/agents/*.py" = ["RUF001"]
+"tests/test_agents.py" = ["RUF001"]
