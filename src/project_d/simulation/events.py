@@ -15,6 +15,10 @@ class EventKind(IntEnum):
     COMMIT = 0
     COMPLETE = 1
     DELIVER = 2
+    ROUND_CLOSE = 3
+    PLAN_SNAPSHOT = 4
+    PLAN_FEEDBACK = 5
+    AGREEMENT = 6
 
 
 @dataclass(frozen=True, order=True)

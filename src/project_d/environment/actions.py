@@ -24,6 +24,11 @@ class ToolStatus(StrEnum):
     INVALID_WAIT = "invalid_wait"
     INVALID_ACTION = "invalid_action"
     AGENT_FINISHED = "agent_finished"
+    PREREQUISITE_NOT_COMPLETED = "prerequisite_not_completed"
+    MESSAGING_ROUND_CLOSED = "messaging_round_closed"
+    WRONG_PHASE = "wrong_phase"
+    PLAN_MISMATCH = "plan_mismatch"
+    INVALID_PLAN = "invalid_plan"
 
 
 @dataclass(frozen=True)
@@ -78,6 +83,20 @@ class Finish:
 
 
 @dataclass(frozen=True)
+class ProposePlan:
+    """Own (job_id, option_id) pairs. Costs always come from the catalog, never from the agent."""
+
+    items: tuple[tuple[str, str], ...]
+    disclosed_alternatives: tuple[tuple[str, str], ...] = ()
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class ConfirmPlan:
+    plan_version: int
+
+
+@dataclass(frozen=True)
 class InvalidCall:
     """A model output that could not become a tool call. The environment logs and refuses it."""
 
@@ -94,5 +113,7 @@ Action = (
     | ReadMessages
     | WaitUntil
     | Finish
+    | ProposePlan
+    | ConfirmPlan
     | InvalidCall
 )
