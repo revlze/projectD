@@ -1,0 +1,78 @@
+{
+  "scenario_id": "test_s4_02",
+  "family": "S4",
+  "budget": 23,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 1711953716,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели. Предпочтителен полный вариант, но для согласованного плана подойдёт и сокращённый.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 14,
+              "duration": 1,
+              "value": 19
+            },
+            {
+              "option_id": "short",
+              "cost": 8,
+              "duration": 1,
+              "value": 15
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку. Предпочтителен полный вариант, но для согласованного плана подойдёт и сокращённый. После основной проверки по возможности стоит проверить влияние доработок. Для этой дополнительной работы подойдёт и сокращённый вариант.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 12,
+              "duration": 4,
+              "value": 20
+            },
+            {
+              "option_id": "short",
+              "cost": 7,
+              "duration": 4,
+              "value": 16
+            }
+          ]
+        },
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 1,
+              "value": 3
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 4,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "regression"
+          ]
+        }
+      ]
+    }
+  ]
+}

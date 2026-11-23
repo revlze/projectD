@@ -1,0 +1,92 @@
+{
+  "scenario_id": "test_s2_03",
+  "family": "S2",
+  "budget": 27,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 3266092984,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели. Предпочтителен полный вариант, но для согласованного плана подойдёт и сокращённый. После основной проверки по возможности стоит подготовить отчёт для обсуждения. Для этой дополнительной работы полный вариант предпочтителен, промежуточный тоже подходит. Сокращённый оставь на крайний случай.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 14,
+              "duration": 5,
+              "value": 19
+            },
+            {
+              "option_id": "short",
+              "cost": 10,
+              "duration": 1,
+              "value": 15
+            }
+          ]
+        },
+        {
+          "job_id": "qa_report",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 6,
+              "value": 3
+            },
+            {
+              "option_id": "medium",
+              "cost": 2,
+              "duration": 1,
+              "value": 2
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 5,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "qa"
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку. После основной проверки по возможности стоит проверить влияние доработок.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 14,
+              "duration": 3,
+              "value": 16
+            }
+          ]
+        },
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 5,
+              "value": 3
+            }
+          ],
+          "requires": [
+            "regression"
+          ]
+        }
+      ]
+    }
+  ]
+}

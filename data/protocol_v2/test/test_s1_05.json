@@ -1,0 +1,126 @@
+{
+  "scenario_id": "test_s1_05",
+  "family": "S1",
+  "budget": 26,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 3665771240,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели. После основной проверки по возможности стоит подготовить отчёт для обсуждения. После этой работы по возможности стоит разобрать типичные ошибки. Для этой дополнительной работы подойдёт и сокращённый вариант.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 10,
+              "duration": 5,
+              "value": 19
+            }
+          ]
+        },
+        {
+          "job_id": "qa_report",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 1,
+              "value": 3
+            }
+          ],
+          "requires": [
+            "qa"
+          ]
+        },
+        {
+          "job_id": "error_review",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 3,
+              "value": 3
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 6,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "qa_report"
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку. После основной проверки по возможности стоит проверить влияние доработок. Для этой дополнительной работы подойдёт и сокращённый вариант. После этой работы по возможности стоит подготовить заметки к релизу. Для этой дополнительной работы полный вариант предпочтителен, промежуточный тоже подходит. Сокращённый оставь на крайний случай.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 13,
+              "duration": 2,
+              "value": 14
+            }
+          ]
+        },
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 6,
+              "value": 3
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 4,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "regression"
+          ]
+        },
+        {
+          "job_id": "release_notes",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 6,
+              "value": 3
+            },
+            {
+              "option_id": "medium",
+              "cost": 2,
+              "duration": 5,
+              "value": 2
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 3,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "ablation"
+          ]
+        }
+      ]
+    }
+  ]
+}

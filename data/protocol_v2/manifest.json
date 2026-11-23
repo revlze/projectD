@@ -1,0 +1,898 @@
+{
+  "seed": 20261123,
+  "submission_open_at": 40,
+  "e3_selection_rule": "Within each of S1-S4, select fixed job-count strata (1,1), (2,2), and (3,3).",
+  "e3_subset": [
+    "test/test_s1_01.json",
+    "test/test_s1_03.json",
+    "test/test_s1_05.json",
+    "test/test_s2_01.json",
+    "test/test_s2_03.json",
+    "test/test_s2_05.json",
+    "test/test_s3_01.json",
+    "test/test_s3_03.json",
+    "test/test_s3_05.json",
+    "test/test_s4_01.json",
+    "test/test_s4_03.json",
+    "test/test_s4_05.json"
+  ],
+  "e4_message_delays": [
+    1,
+    4,
+    8
+  ],
+  "files": {
+    "dev/dev_s0_01.json": {
+      "sha256": "982d05f08704caeecb0e137ac533d9eba8445a0e1987b474e443f5cdd575c7f9",
+      "family": "S0",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          1
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 28,
+        "cheapest_total_cost": 28,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 0,
+        "primary_priority_gap": 6
+      },
+      "u_star": 37
+    },
+    "dev/dev_s0_02.json": {
+      "sha256": "d73304fac7166660689bfb63bc3448858bb0637b58e7faa8e665e1b534c9954d",
+      "family": "S0",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          2,
+          1,
+          2
+        ],
+        "dependency_edges": 3,
+        "preferred_total_cost": 33,
+        "cheapest_total_cost": 29,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 0,
+        "primary_priority_gap": 2
+      },
+      "u_star": 45
+    },
+    "dev/dev_s1_01.json": {
+      "sha256": "521f09b2008e2254244cdc5d8fb76b56f2d7c32903780058cc49fdbe025aa94a",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          2
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 27,
+        "cheapest_total_cost": 25,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 3,
+        "primary_priority_gap": 3
+      },
+      "u_star": 29
+    },
+    "dev/dev_s1_02.json": {
+      "sha256": "99e61e4b513e3b8be4c87e7587460bd781d980dd59e76c100a12ff00930ab288",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          2
+        ],
+        "options_per_job": [
+          1,
+          2,
+          3,
+          1,
+          3
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 35,
+        "cheapest_total_cost": 29,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 10,
+        "primary_priority_gap": 1
+      },
+      "u_star": 27
+    },
+    "dev/dev_s2_01.json": {
+      "sha256": "1917ec841048937985cc7e592ebbd10fa87b4c6847baac3de3c8146ad28b6186",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          2,
+          1,
+          3
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 27,
+        "cheapest_total_cost": 20,
+        "primary_cost_over_budget": 4,
+        "preferred_cost_over_budget": 7,
+        "primary_priority_gap": 4
+      },
+      "u_star": 27
+    },
+    "dev/dev_s2_02.json": {
+      "sha256": "4deb8a1f3bf7aa5d461118dd2c18843fc13d764c4b6c36b65007844be02b865a",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          2
+        ],
+        "options_per_job": [
+          2,
+          3,
+          1,
+          1,
+          1
+        ],
+        "dependency_edges": 3,
+        "preferred_total_cost": 31,
+        "cheapest_total_cost": 23,
+        "primary_cost_over_budget": 2,
+        "preferred_cost_over_budget": 11,
+        "primary_priority_gap": 3
+      },
+      "u_star": 35
+    },
+    "dev/dev_s3_01.json": {
+      "sha256": "fec9effd1f6ef1c4e8ac18bed365b515f15aa993c7927a569f0631d3fe5c0273",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          1
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 28,
+        "cheapest_total_cost": 28,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 4,
+        "primary_priority_gap": 18
+      },
+      "u_star": 27
+    },
+    "dev/dev_s3_02.json": {
+      "sha256": "89a5d70395a8f82935c6a5550ac4296f5380834c91e7818c2907504612c0d6b6",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          2,
+          1,
+          2
+        ],
+        "dependency_edges": 3,
+        "preferred_total_cost": 32,
+        "cheapest_total_cost": 28,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 12,
+        "primary_priority_gap": 17
+      },
+      "u_star": 32
+    },
+    "dev/dev_s4_01.json": {
+      "sha256": "aaee247f05b87e291643767e94e156d43b6c1abe58f51d69f5913038413b3f0c",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          2,
+          2,
+          2
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 27,
+        "cheapest_total_cost": 16,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 6,
+        "primary_priority_gap": 1
+      },
+      "u_star": 32
+    },
+    "dev/dev_s4_02.json": {
+      "sha256": "e6ec182b6d80695d0c36b1b26dd5fc14c235f93a48e3f4c42faf5ae6b1699620",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          2
+        ],
+        "options_per_job": [
+          2,
+          2,
+          3,
+          2,
+          3
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 34,
+        "cheapest_total_cost": 17,
+        "primary_cost_over_budget": 2,
+        "preferred_cost_over_budget": 11,
+        "primary_priority_gap": 5
+      },
+      "u_star": 38
+    },
+    "test/test_s0_01.json": {
+      "sha256": "e66ea4e09735187bf44b2b312d16a99309ccfe67d6c6f5fbecce975897c39182",
+      "family": "S0",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          1
+        ],
+        "options_per_job": [
+          1,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 25,
+        "cheapest_total_cost": 25,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 0,
+        "primary_priority_gap": 4
+      },
+      "u_star": 30
+    },
+    "test/test_s0_02.json": {
+      "sha256": "504730206b3fa6dd808c818f97fa984d37a48a7dd4d47bed695b04a4b5189f05",
+      "family": "S0",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          1
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 27,
+        "cheapest_total_cost": 27,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 0,
+        "primary_priority_gap": 5
+      },
+      "u_star": 36
+    },
+    "test/test_s0_03.json": {
+      "sha256": "739feb6991e7aed99bb6320ca5dbcf530d5cc8a655fe4a11ff1257c01fcb65fd",
+      "family": "S0",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          1,
+          2
+        ],
+        "dependency_edges": 2,
+        "preferred_total_cost": 34,
+        "cheapest_total_cost": 32,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 0,
+        "primary_priority_gap": 5
+      },
+      "u_star": 41
+    },
+    "test/test_s0_04.json": {
+      "sha256": "4e767d55bda5c2f489a262c1f3119d1ecb729f1ac763112145165f664c1a5c4f",
+      "family": "S0",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          3
+        ],
+        "options_per_job": [
+          1,
+          2,
+          1,
+          3,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 35,
+        "cheapest_total_cost": 31,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 0,
+        "primary_priority_gap": 2
+      },
+      "u_star": 45
+    },
+    "test/test_s1_01.json": {
+      "sha256": "2612f960c304c720967979557b7743d8e236673e54680984229498d79271990f",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          1
+        ],
+        "options_per_job": [
+          1,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 25,
+        "cheapest_total_cost": 25,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 3,
+        "primary_priority_gap": 4
+      },
+      "u_star": 19
+    },
+    "test/test_s1_02.json": {
+      "sha256": "1458f2eb556838ed11d03488d7c7fbf7a1419ae7fae47240bb6bff19f05fbb5a",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          2
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 30,
+        "cheapest_total_cost": 28,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 4,
+        "primary_priority_gap": 2
+      },
+      "u_star": 19
+    },
+    "test/test_s1_03.json": {
+      "sha256": "d410a24428ab489b4e3c95ec5ad6c4db44c068354480505354da7cba7933db32",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          2
+        ],
+        "options_per_job": [
+          1,
+          2,
+          1,
+          3
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 29,
+        "cheapest_total_cost": 25,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 7,
+        "primary_priority_gap": 2
+      },
+      "u_star": 21
+    },
+    "test/test_s1_04.json": {
+      "sha256": "cf286df0eba536c7116f05eb2a05989e78a1516bcfaf95638e9909e9c72461f5",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          3
+        ],
+        "options_per_job": [
+          1,
+          3,
+          1,
+          1,
+          2
+        ],
+        "dependency_edges": 3,
+        "preferred_total_cost": 31,
+        "cheapest_total_cost": 27,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 6,
+        "primary_priority_gap": 1
+      },
+      "u_star": 42
+    },
+    "test/test_s1_05.json": {
+      "sha256": "cde0e244ec50d4232d0df392d1d4c2f40f4e2231b78da7264f37ca3bcc93e251",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          3
+        ],
+        "options_per_job": [
+          1,
+          1,
+          2,
+          1,
+          2,
+          3
+        ],
+        "dependency_edges": 4,
+        "preferred_total_cost": 35,
+        "cheapest_total_cost": 29,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 9,
+        "primary_priority_gap": 5
+      },
+      "u_star": 36
+    },
+    "test/test_s1_06.json": {
+      "sha256": "fb27b32d020dce81886165b84f47214f5f30a3884c7670eab4d852cf8413813d",
+      "family": "S1",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          1
+        ],
+        "options_per_job": [
+          1,
+          2,
+          3,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 28,
+        "cheapest_total_cost": 24,
+        "primary_cost_over_budget": 0,
+        "preferred_cost_over_budget": 5,
+        "primary_priority_gap": 5
+      },
+      "u_star": 36
+    },
+    "test/test_s2_01.json": {
+      "sha256": "109de59ca38293f41a78757538697d7fa0f9076bb9c997e95268e3cd31b517bd",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          1
+        ],
+        "options_per_job": [
+          2,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 20,
+        "cheapest_total_cost": 14,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 1,
+        "primary_priority_gap": 2
+      },
+      "u_star": 33
+    },
+    "test/test_s2_02.json": {
+      "sha256": "9e60bf7f828caaa8fbc1b3d8c349ab1cb7714a51001cb6d032096df7b13b1fdb",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          2,
+          1,
+          3
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 27,
+        "cheapest_total_cost": 21,
+        "primary_cost_over_budget": 4,
+        "preferred_cost_over_budget": 7,
+        "primary_priority_gap": 2
+      },
+      "u_star": 32
+    },
+    "test/test_s2_03.json": {
+      "sha256": "23ee5e614396b46b2f71bb15e66aa0d7f1554acf8bbceb34fa800fe62fe52220",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          2
+        ],
+        "options_per_job": [
+          2,
+          3,
+          1,
+          1
+        ],
+        "dependency_edges": 2,
+        "preferred_total_cost": 34,
+        "cheapest_total_cost": 28,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 7,
+        "primary_priority_gap": 3
+      },
+      "u_star": 34
+    },
+    "test/test_s2_04.json": {
+      "sha256": "6a12de0df0fdbfcf2972b1c4f202f209334421411f9e69321d2776cf331600bf",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          3
+        ],
+        "options_per_job": [
+          2,
+          1,
+          1,
+          2,
+          3
+        ],
+        "dependency_edges": 3,
+        "preferred_total_cost": 30,
+        "cheapest_total_cost": 20,
+        "primary_cost_over_budget": 4,
+        "preferred_cost_over_budget": 13,
+        "primary_priority_gap": 2
+      },
+      "u_star": 30
+    },
+    "test/test_s2_05.json": {
+      "sha256": "2b56a5175c1337feb008a6b7b385c0c7b5da589d89bb98a04c054cbd4b66cf7f",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          3
+        ],
+        "options_per_job": [
+          2,
+          2,
+          3,
+          1,
+          3,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 37,
+        "cheapest_total_cost": 27,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 13,
+        "primary_priority_gap": 2
+      },
+      "u_star": 34
+    },
+    "test/test_s2_06.json": {
+      "sha256": "bdaa1ace053ba304bcf16ee98b225702f623613f019b2fe5791215baf8b9a74f",
+      "family": "S2",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          1
+        ],
+        "options_per_job": [
+          2,
+          3,
+          1,
+          1
+        ],
+        "dependency_edges": 2,
+        "preferred_total_cost": 26,
+        "cheapest_total_cost": 18,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 9,
+        "primary_priority_gap": 1
+      },
+      "u_star": 34
+    },
+    "test/test_s3_01.json": {
+      "sha256": "3781e925f708c4418e0c251a05246db5417e4c7acad0f633f80932618b454b93",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          1
+        ],
+        "options_per_job": [
+          1,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 25,
+        "cheapest_total_cost": 25,
+        "primary_cost_over_budget": 4,
+        "preferred_cost_over_budget": 4,
+        "primary_priority_gap": 21
+      },
+      "u_star": 31
+    },
+    "test/test_s3_02.json": {
+      "sha256": "3419d338d9bca5be9db9d09ae103213430d805554a98e00a4de16611f968ed5f",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          1
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 27,
+        "cheapest_total_cost": 27,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 4,
+        "primary_priority_gap": 20
+      },
+      "u_star": 28
+    },
+    "test/test_s3_03.json": {
+      "sha256": "a8b5081794cc6b28d685ea4a3033123af91a510bfda45449d3715c7e9bd2a5d3",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          2
+        ],
+        "options_per_job": [
+          1,
+          1,
+          1,
+          2
+        ],
+        "dependency_edges": 2,
+        "preferred_total_cost": 30,
+        "cheapest_total_cost": 28,
+        "primary_cost_over_budget": 4,
+        "preferred_cost_over_budget": 10,
+        "primary_priority_gap": 20
+      },
+      "u_star": 33
+    },
+    "test/test_s3_04.json": {
+      "sha256": "21e61b40974fd56f5229041ab30904ed4983be79a229976b25c8287b7f9368c2",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          3
+        ],
+        "options_per_job": [
+          1,
+          2,
+          1,
+          3,
+          1
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 34,
+        "cheapest_total_cost": 30,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 10,
+        "primary_priority_gap": 23
+      },
+      "u_star": 41
+    },
+    "test/test_s3_05.json": {
+      "sha256": "877f9b676695f92868c96654855c27a7cd23c69672afb19f197918f3c7b35b0d",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          3
+        ],
+        "options_per_job": [
+          1,
+          3,
+          1,
+          1,
+          1,
+          2
+        ],
+        "dependency_edges": 4,
+        "preferred_total_cost": 38,
+        "cheapest_total_cost": 34,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 15,
+        "primary_priority_gap": 19
+      },
+      "u_star": 34
+    },
+    "test/test_s3_06.json": {
+      "sha256": "dd46e856bfe45e9f988ca55b2de9490580e591897103038ef701488692b7034f",
+      "family": "S3",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          1
+        ],
+        "options_per_job": [
+          1,
+          1,
+          2,
+          1
+        ],
+        "dependency_edges": 2,
+        "preferred_total_cost": 29,
+        "cheapest_total_cost": 27,
+        "primary_cost_over_budget": 2,
+        "preferred_cost_over_budget": 8,
+        "primary_priority_gap": 17
+      },
+      "u_star": 33
+    },
+    "test/test_s4_01.json": {
+      "sha256": "f25e5a45015c599f259d1f4a22e3e5a91eed538da11bb33a39d277a024aea85c",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          1
+        ],
+        "options_per_job": [
+          2,
+          2
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 26,
+        "cheapest_total_cost": 15,
+        "primary_cost_over_budget": 2,
+        "preferred_cost_over_budget": 2,
+        "primary_priority_gap": 2
+      },
+      "u_star": 28
+    },
+    "test/test_s4_02.json": {
+      "sha256": "3aebccce53bbe13766d19929921205d9fcbc73904a695c8e36f865f32118413a",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          1,
+          2
+        ],
+        "options_per_job": [
+          2,
+          2,
+          2
+        ],
+        "dependency_edges": 1,
+        "preferred_total_cost": 29,
+        "cheapest_total_cost": 16,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 6,
+        "primary_priority_gap": 1
+      },
+      "u_star": 38
+    },
+    "test/test_s4_03.json": {
+      "sha256": "957bfedb068ae716f99d9fd64c0bf34d23288a4078b57d821e34df5ca0a7ec12",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          2
+        ],
+        "options_per_job": [
+          2,
+          2,
+          2,
+          3
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 30,
+        "cheapest_total_cost": 17,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 7,
+        "primary_priority_gap": 6
+      },
+      "u_star": 34
+    },
+    "test/test_s4_04.json": {
+      "sha256": "fa78677adb964381b8296afb762df4c85bab9a1579bae0246982cba2cda54dc1",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          2,
+          3
+        ],
+        "options_per_job": [
+          2,
+          3,
+          2,
+          1,
+          2
+        ],
+        "dependency_edges": 3,
+        "preferred_total_cost": 29,
+        "cheapest_total_cost": 15,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 12,
+        "primary_priority_gap": 2
+      },
+      "u_star": 33
+    },
+    "test/test_s4_05.json": {
+      "sha256": "f46e250eb502ab37856e054d81e7a53abab8dbb6443a26a9063cbfd2a4d09bca",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          3
+        ],
+        "options_per_job": [
+          2,
+          1,
+          2,
+          2,
+          2,
+          3
+        ],
+        "dependency_edges": 4,
+        "preferred_total_cost": 37,
+        "cheapest_total_cost": 21,
+        "primary_cost_over_budget": 1,
+        "preferred_cost_over_budget": 13,
+        "primary_priority_gap": 1
+      },
+      "u_star": 41
+    },
+    "test/test_s4_06.json": {
+      "sha256": "eb16f4956629954fe39015613266b4814f986a004869a60545c34c0808520caf",
+      "family": "S4",
+      "features": {
+        "jobs_per_agent": [
+          3,
+          1
+        ],
+        "options_per_job": [
+          2,
+          2,
+          3,
+          2
+        ],
+        "dependency_edges": 0,
+        "preferred_total_cost": 30,
+        "cheapest_total_cost": 16,
+        "primary_cost_over_budget": 3,
+        "preferred_cost_over_budget": 9,
+        "primary_priority_gap": 5
+      },
+      "u_star": 32
+    }
+  }
+}

@@ -1,0 +1,86 @@
+{
+  "scenario_id": "test_s1_06",
+  "family": "S1",
+  "budget": 23,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 1986216015,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели. Если останется возможность, стоит подготовить отчёт для обсуждения. Для этой дополнительной работы подойдёт и сокращённый вариант. Если останется возможность, стоит разобрать типичные ошибки. Для этой дополнительной работы полный вариант предпочтителен, промежуточный тоже подходит. Сокращённый оставь на крайний случай.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 12,
+              "duration": 6,
+              "value": 20
+            }
+          ]
+        },
+        {
+          "job_id": "qa_report",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 4,
+              "value": 3
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 6,
+              "value": 1
+            }
+          ]
+        },
+        {
+          "job_id": "error_review",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 3,
+              "value": 3
+            },
+            {
+              "option_id": "medium",
+              "cost": 2,
+              "duration": 4,
+              "value": 2
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 1,
+              "value": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 10,
+              "duration": 1,
+              "value": 15
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

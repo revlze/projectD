@@ -1,0 +1,60 @@
+{
+  "scenario_id": "dev_s0_01",
+  "family": "S0",
+  "budget": 28,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 317149051,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 11,
+              "duration": 2,
+              "value": 20
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку. После основной проверки по возможности стоит проверить влияние доработок.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 14,
+              "duration": 4,
+              "value": 14
+            }
+          ]
+        },
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 4,
+              "value": 3
+            }
+          ],
+          "requires": [
+            "regression"
+          ]
+        }
+      ]
+    }
+  ]
+}

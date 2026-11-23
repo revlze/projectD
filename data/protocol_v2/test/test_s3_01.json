@@ -1,0 +1,46 @@
+{
+  "scenario_id": "test_s3_01",
+  "family": "S3",
+  "budget": 21,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 2799579857,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Обязательно проверить качество модели.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 11,
+              "duration": 1,
+              "value": 31
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "По возможности провести регрессионную проверку.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 14,
+              "duration": 6,
+              "value": 10
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
