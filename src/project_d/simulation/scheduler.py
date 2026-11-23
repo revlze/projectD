@@ -23,6 +23,9 @@ class Observation:
     unread_messages: int
     last_result: ToolResult | None
     own_jobs: tuple[dict[str, Any], ...] = ()
+    phase: str | None = None
+    inbox: tuple[dict[str, Any], ...] = ()
+    plan_view: dict[str, Any] | None = None
 
 
 class Policy(Protocol):
@@ -87,6 +90,7 @@ def run_episode(
             break
 
         ready = [a for a in env.processing_order if env.is_ready(a) and turns[a] < limit]
+        inboxes = {agent_id: env.take_inbox(agent_id) for agent_id in ready}
         decisions = {
             agent_id: policies[agent_id].decide(
                 Observation(
@@ -97,6 +101,9 @@ def run_episode(
                     unread_messages=env.unread_count(agent_id),
                     last_result=last_results[agent_id],
                     own_jobs=tuple(env.own_jobs(agent_id)),
+                    phase=env.phase(),
+                    inbox=inboxes[agent_id],
+                    plan_view=env.plan_view(),
                 )
             )
             for agent_id in ready

@@ -17,10 +17,23 @@ from project_d.agents.llm_client import (
     LLMTransportError,
     OpenAICompatibleClient,
 )
+from project_d.agents.prompts import (
+    PROMPT_VERSION,
+    build_protocol_prompt,
+    prompt_sha256,
+    protocol_note,
+)
 from project_d.agents.tools import parse_tool_call, render_result, tool_schemas
 from project_d.environment.actions import Action, InvalidCall, SendMessage
 from project_d.environment.journal import write_jsonl
-from project_d.environment.model import AgentSpec, Mode, RunConfig, Scenario, load_scenario
+from project_d.environment.model import (
+    AgentSpec,
+    Mode,
+    RunConfig,
+    Scenario,
+    Variant,
+    load_scenario,
+)
 from project_d.evaluation.audit import audit_episode
 from project_d.simulation.scheduler import EpisodeResult, Observation, run_episode
 
@@ -28,8 +41,11 @@ PILOT_SCENARIOS = ("s0_01", "s1_01", "s2_01", "s3_01", "s4_pilot")
 
 
 def build_system_prompt(
-    agent: AgentSpec, other_agent: str, mode: Mode, submission_open_at: int
+    agent: AgentSpec, other_agent: str, mode: Mode | Variant, submission_open_at: int
 ) -> str:
+    """B0-B3 keep the historical text; explicit variants use the versioned protocol prompts."""
+    if isinstance(mode, Variant):
+        return build_protocol_prompt(agent, other_agent, mode, submission_open_at)
     lines = [
         f"Ты автономный агент {agent.agent_id} и выполняешь поручение своего пользователя.",
         "Бюджет вычислительных кредитов общий с другим агентом, работающим на другого "
@@ -61,6 +77,7 @@ def _render_jobs(jobs: tuple[dict[str, Any], ...]) -> str:
     return "; ".join(
         f"{job['job_id']} [{job['status']}]: "
         + ", ".join(f"{o['option_id']} (стоимость {o['cost']})" for o in job["options"])
+        + (f"; requires: {', '.join(job['requires'])}" if job.get("requires") else "")
         for job in jobs
     )
 
@@ -85,20 +102,20 @@ class LLMPolicy:
         self,
         agent: AgentSpec,
         other_agent: str,
-        mode: Mode,
+        mode: Mode | Variant,
         submission_open_at: int,
         client: ChatClient,
     ) -> None:
         self.agent = agent
         self.client = client
+        self.mode = mode
+        self.other_agent = other_agent
         self.tools = tool_schemas(mode)
         self.messaging = mode.messaging
         self._sent_message = False
+        self.system_prompt = build_system_prompt(agent, other_agent, mode, submission_open_at)
         self.messages: list[dict[str, Any]] = [
-            {
-                "role": "system",
-                "content": build_system_prompt(agent, other_agent, mode, submission_open_at),
-            },
+            {"role": "system", "content": self.system_prompt},
             {"role": "user", "content": agent.user_request},
         ]
         self.turns: list[TurnRecord] = []
@@ -176,6 +193,10 @@ class LLMPolicy:
         return action
 
     def _coordination_note(self, observation: Observation) -> str:
+        if isinstance(self.mode, Variant) and self.mode.round_times:
+            return protocol_note(
+                observation.phase, observation.inbox, observation.plan_view, self.other_agent
+            )
         if not self.messaging or observation.logical_time >= observation.submission_open_at:
             return ""
         if observation.unread_messages:
@@ -213,6 +234,7 @@ class LLMEpisode:
     result: EpisodeResult | None
     turns: list[TurnRecord] = field(default_factory=list)
     failure: str | None = None
+    prompts: dict[str, Any] = field(default_factory=dict)
 
 
 def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -> LLMEpisode:
@@ -240,7 +262,16 @@ def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -
         (turn for policy in policies.values() for turn in policy.turns),
         key=lambda turn: (turn.logical_time, turn.agent_id),
     )
-    return LLMEpisode(result, turns, failure)
+    prompts = {
+        "version": PROMPT_VERSION if isinstance(config.mode, Variant) else "legacy",
+        "system_sha256": {
+            agent_id: prompt_sha256(policy.system_prompt) for agent_id, policy in policies.items()
+        },
+        "tools_sha256": prompt_sha256(
+            json.dumps(tool_schemas(config.mode), ensure_ascii=False, sort_keys=True)
+        ),
+    }
+    return LLMEpisode(result, turns, failure, prompts)
 
 
 def write_episode(directory: Path, name: str, episode: LLMEpisode) -> None:
@@ -250,6 +281,9 @@ def write_episode(directory: Path, name: str, episode: LLMEpisode) -> None:
     with (directory / f"{name}.llm.jsonl").open("w", encoding="utf-8") as handle:
         for turn in episode.turns:
             handle.write(json.dumps(asdict(turn), ensure_ascii=False) + "\n")
+    (directory / f"{name}.prompts.json").write_text(
+        json.dumps(episode.prompts, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
 
 def summarize(name: str, episode: LLMEpisode) -> dict[str, Any]:

@@ -1,0 +1,80 @@
+{
+  "scenario_id": "test_s3_03",
+  "family": "S3",
+  "budget": 20,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 1197716561,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Обязательно проверить качество модели. После основной проверки по возможности стоит подготовить отчёт для обсуждения.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 12,
+              "duration": 2,
+              "value": 30
+            }
+          ]
+        },
+        {
+          "job_id": "qa_report",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 2,
+              "value": 3
+            }
+          ],
+          "requires": [
+            "qa"
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "По возможности провести регрессионную проверку. После основной проверки по возможности стоит проверить влияние доработок. Для этой дополнительной работы подойдёт и сокращённый вариант.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 12,
+              "duration": 5,
+              "value": 10
+            }
+          ]
+        },
+        {
+          "job_id": "ablation",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 1,
+              "value": 3
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 3,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "regression"
+          ]
+        }
+      ]
+    }
+  ]
+}

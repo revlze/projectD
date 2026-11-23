@@ -1,0 +1,92 @@
+{
+  "scenario_id": "test_s2_06",
+  "family": "S2",
+  "budget": 17,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 3763631699,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели. Предпочтителен полный вариант, но для согласованного плана подойдёт и сокращённый. После основной проверки по возможности стоит подготовить отчёт для обсуждения. Для этой дополнительной работы полный вариант предпочтителен, промежуточный тоже подходит. Сокращённый оставь на крайний случай. После основной проверки по возможности стоит разобрать типичные ошибки.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 10,
+              "duration": 2,
+              "value": 18
+            },
+            {
+              "option_id": "short",
+              "cost": 4,
+              "duration": 1,
+              "value": 14
+            }
+          ]
+        },
+        {
+          "job_id": "qa_report",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 5,
+              "value": 3
+            },
+            {
+              "option_id": "medium",
+              "cost": 2,
+              "duration": 3,
+              "value": 2
+            },
+            {
+              "option_id": "short",
+              "cost": 1,
+              "duration": 6,
+              "value": 1
+            }
+          ],
+          "requires": [
+            "qa"
+          ]
+        },
+        {
+          "job_id": "error_review",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 3,
+              "duration": 4,
+              "value": 3
+            }
+          ],
+          "requires": [
+            "qa"
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 10,
+              "duration": 1,
+              "value": 17
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

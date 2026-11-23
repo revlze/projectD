@@ -1,0 +1,58 @@
+{
+  "scenario_id": "test_s4_01",
+  "family": "S4",
+  "budget": 24,
+  "horizon": 80,
+  "commit_delay": 2,
+  "message_delay": 1,
+  "agent_turn_limit": 24,
+  "seed": 3908384584,
+  "agents": [
+    {
+      "agent_id": "A",
+      "user_request": "Прежде всего нужно проверить качество модели. Предпочтителен полный вариант, но для согласованного плана подойдёт и сокращённый.",
+      "jobs": [
+        {
+          "job_id": "qa",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 14,
+              "duration": 5,
+              "value": 16
+            },
+            {
+              "option_id": "short",
+              "cost": 8,
+              "duration": 4,
+              "value": 14
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "agent_id": "B",
+      "user_request": "Прежде всего нужно провести регрессионную проверку. Предпочтителен полный вариант, но для согласованного плана подойдёт и сокращённый.",
+      "jobs": [
+        {
+          "job_id": "regression",
+          "options": [
+            {
+              "option_id": "full",
+              "cost": 12,
+              "duration": 2,
+              "value": 14
+            },
+            {
+              "option_id": "short",
+              "cost": 7,
+              "duration": 2,
+              "value": 11
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
