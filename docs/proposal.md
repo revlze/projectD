@@ -13,14 +13,19 @@
 ```mermaid
 sequenceDiagram
     participant A as Агент A
-    participant P as Общий пул
+    participant P as Среда (общий пул)
     participant B as Агент B
-    A->>P: Проверить доступность 7 кредитов
+    A->>P: get_balance()
     P-->>A: Доступно 12
-    B->>P: Проверить доступность 6 кредитов
+    B->>P: get_balance()
     P-->>B: Доступно 12
-    A->>P: Запустить задание (−7)
-    B->>P: Запустить задание (−6)
+    A->>P: submit_job (цена 7)
+    P-->>A: accepted (spent = 0, 12 ≥ 7)
+    B->>P: submit_job (цена 6)
+    P-->>B: accepted (spent = 0, 12 ≥ 6)
+    Note over P: Ожидание commit_delay, кредиты не заняты
+    P->>P: commit A, spent = 7
+    P->>P: commit B без повторной проверки, spent = 13
     Note over P: Суммарно списано 13 из 12
 ```
 
