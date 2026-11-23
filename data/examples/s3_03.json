@@ -2,10 +2,10 @@
   "scenario_id": "s3_03",
   "family": "S3",
   "budget": 15,
-  "horizon": 20,
+  "horizon": 30,
   "commit_delay": 2,
   "message_delay": 1,
-  "agent_turn_limit": 10,
+  "agent_turn_limit": 16,
   "seed": 45,
   "agents": [
     {

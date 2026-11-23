@@ -2,10 +2,10 @@
   "scenario_id": "s2_02",
   "family": "S2",
   "budget": 10,
-  "horizon": 20,
+  "horizon": 30,
   "commit_delay": 2,
   "message_delay": 1,
-  "agent_turn_limit": 10,
+  "agent_turn_limit": 16,
   "seed": 44,
   "agents": [
     {
