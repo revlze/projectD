@@ -16,6 +16,7 @@ from project_d.agents.llm_client import (
 )
 from project_d.agents.runner import (
     PILOT_SCENARIOS,
+    build_system_prompt,
     pilot_config,
     run_llm_episode,
     run_pilot,
@@ -23,7 +24,7 @@ from project_d.agents.runner import (
 )
 from project_d.agents.tools import parse_tool_call, tool_schemas
 from project_d.environment.actions import InvalidCall, SubmitJob, ToolStatus, WaitUntil
-from project_d.environment.model import JobStatus, Mode, RunConfig
+from project_d.environment.model import JobStatus, Mode, RunConfig, load_scenario
 from project_d.evaluation.audit import audit_episode
 from support import make_config, make_scenario
 
@@ -207,9 +208,17 @@ def test_pilot_runs_all_twenty_episodes(tmp_path: Path) -> None:
     assert (tmp_path / "s1_01_B0.llm.jsonl").exists()
 
 
-def test_pilot_config_overrides_stale_json_limits() -> None:
+def test_pilot_uses_limits_from_scenario_files() -> None:
     config = pilot_config(Mode.B0)
-    assert (config.horizon, config.agent_turn_limit, config.submission_open_at) == (30, 16, 13)
+    resolved = config.apply(load_scenario(EXAMPLES / "s1_01.json"))
+    assert (resolved.horizon, resolved.agent_turn_limit, config.submission_open_at) == (30, 16, 13)
+
+
+@pytest.mark.parametrize("mode", list(Mode))
+def test_coordination_instruction_only_in_communication_modes(mode: Mode) -> None:
+    agent = load_scenario(EXAMPLES / "s1_01.json").agents[0]
+    prompt = build_system_prompt(agent, "B", mode, 13)
+    assert ("обязательно согласуй план" in prompt) is mode.messaging
 
 
 class _Handler(BaseHTTPRequestHandler):

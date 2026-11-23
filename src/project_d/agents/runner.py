@@ -25,9 +25,6 @@ from project_d.evaluation.audit import audit_episode
 from project_d.simulation.scheduler import EpisodeResult, Observation, run_episode
 
 PILOT_SCENARIOS = ("s0_01", "s1_01", "s2_01", "s3_01", "s4_pilot")
-# The JSON files still carry horizon=20 and agent_turn_limit=10, which predate the t=13 window.
-PILOT_HORIZON = 30
-PILOT_TURN_LIMIT = 16
 
 
 def build_system_prompt(
@@ -46,7 +43,11 @@ def build_system_prompt(
     ]
     if mode.messaging:
         lines.append(
-            f"До начала приёма заявок можно обмениваться сообщениями с агентом {other_agent}. "
+            f"До начала приёма заявок обязательно согласуй план с агентом {other_agent}: отправь "
+            "ему через send_message свой план и стоимость, дождись его сообщения через "
+            "wait_until, прочитай его через read_messages, ответь и учти это при выборе варианта."
+        )
+        lines.append(
             "Сообщения приходят с задержкой, не резервируют кредиты и не являются обязательством."
         )
     return "\n".join(lines)
@@ -244,7 +245,7 @@ def summarize(name: str, episode: LLMEpisode) -> dict[str, Any]:
 
 
 def pilot_config(mode: Mode) -> RunConfig:
-    return RunConfig(mode=mode, horizon=PILOT_HORIZON, agent_turn_limit=PILOT_TURN_LIMIT)
+    return RunConfig(mode=mode)
 
 
 def run_pilot(
