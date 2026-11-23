@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from itertools import permutations, product
+from typing import Any
 
 from project_d.environment.actions import ToolStatus
 from project_d.environment.journal import EpisodeMetadata, LogEntry
@@ -91,6 +92,116 @@ def optimal_utility(
             best_value = value
             best_plan = tuple(item for _, _, plan in combination for item in plan)
     return best_value, tuple(sorted(best_plan, key=lambda item: (item.submit_at, item.agent_id)))
+
+
+@dataclass(frozen=True)
+class AgreementMetrics:
+    """Diagnostics of the confirmed plan. Every field is None in variants without plans."""
+
+    agreed: bool | None = None
+    agreed_over_budget: bool | None = None
+    valid_agreement: bool | None = None
+    agreed_total: int | None = None
+    agreed_overage: int | None = None
+    agreed_jobs: int | None = None
+    agreed_jobs_completed: int | None = None
+    agreed_plan_completed: bool | None = None
+    v_warned_agents: int | None = None
+    v_warning_status: str | None = None
+
+
+def agreement_metrics(
+    entries: Iterable[LogEntry],
+    budget: int,
+    shown: Iterable[tuple[str, int, dict[str, Any] | None]] = (),
+) -> AgreementMetrics:
+    """Score the agreement from the journal and what each agent's prompt actually contained.
+
+    ``shown`` holds (agent_id, logical_time, shown_plan) per LLM turn. ``v_warning_status`` is set
+    only for an over-budget agreement: ``warned_and_confirmed``, ``warning_not_delivered`` or
+    ``no_v`` for variants without the V check.
+    """
+    log = tuple(entries)
+    row = next((e for e in log if e.event_type == "agreement"), None)
+    if row is None:
+        return AgreementMetrics()
+
+    versions = {
+        e.detail["plan_version"]: e.detail["proposals"]
+        for e in log
+        if e.event_type == "plan_version"
+    }
+    confirmed_at = {
+        e.agent_id: (e.time, e.detail["plan_version"])
+        for e in log
+        if e.event_type == "confirm_plan" and e.result == "ok"
+    }
+    has_v = any(e.event_type == "plan_feedback" for e in log)
+    turns = tuple(shown)
+    final = max(versions, default=None)
+
+    def warned(agent_id: str, version: int | None, until: int) -> bool:
+        return any(
+            agent == agent_id
+            and time <= until
+            and plan is not None
+            and plan["plan_version"] == version
+            and plan["feedback_shown"]
+            and plan["overage"] > 0
+            for agent, time, plan in turns
+        )
+
+    agents = sorted({e.agent_id for e in log if e.agent_id is not None})
+    warned_agents = None
+    if has_v:
+        warned_agents = sum(
+            warned(agent, confirmed_at[agent][1], confirmed_at[agent][0])
+            if agent in confirmed_at
+            else warned(agent, final, row.time)
+            for agent in agents
+        )
+
+    if row.result != "agreed":
+        return AgreementMetrics(
+            agreed=False,
+            agreed_over_budget=False,
+            valid_agreement=False,
+            v_warned_agents=warned_agents,
+        )
+
+    version = row.detail["plan_version"]
+    items = {
+        (item["job_id"], item["option_id"]): item["cost"]
+        for proposal in versions[version].values()
+        for item in proposal["items"]
+    }
+    total = sum(items.values())
+    over_budget = total > budget
+    finished = {(e.job_id, e.option_id) for e in log if e.event_type == "complete"}
+    completed = sum(pair in finished for pair in items)
+
+    status = None
+    if over_budget and not has_v:
+        status = "no_v"
+    elif over_budget:
+        delivered = all(
+            agent in confirmed_at and warned(agent, version, confirmed_at[agent][0])
+            for agent in versions[version]
+        )
+        status = "warned_and_confirmed" if delivered else "warning_not_delivered"
+
+    return AgreementMetrics(
+        agreed=True,
+        agreed_over_budget=over_budget,
+        valid_agreement=not over_budget,
+        agreed_total=total,
+        agreed_overage=max(total - budget, 0),
+        agreed_jobs=len(items),
+        agreed_jobs_completed=completed,
+        agreed_plan_completed=completed == len(items),
+        v_warned_agents=warned_agents,
+        v_warning_status=status,
+    )
 
 
 @dataclass(frozen=True)

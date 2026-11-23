@@ -35,7 +35,7 @@ from project_d.environment.model import (
     load_scenario,
 )
 from project_d.evaluation.audit import audit_episode
-from project_d.evaluation.metrics import episode_metrics
+from project_d.evaluation.metrics import agreement_metrics, episode_metrics
 from project_d.simulation.scheduler import ScriptedPolicy, run_episode
 
 DATA_ROOT = Path("data/protocol_v2")
@@ -240,6 +240,8 @@ def summarize_episode(
         "plan_mismatches": audit.plan_mismatches,
         "audit_issues": len(audit.issues),
     }
+    shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in episode.turns]
+    row |= asdict(agreement_metrics(result.log, result.metadata.budget, shown))
     return row
 
 
