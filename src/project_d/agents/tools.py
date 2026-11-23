@@ -7,21 +7,28 @@ from typing import Any
 
 from project_d.environment.actions import (
     Action,
+    ConfirmPlan,
     Finish,
     GetBalance,
     GetStatus,
     InvalidCall,
     ListJobs,
+    ProposePlan,
     ReadMessages,
     SendMessage,
     SubmitJob,
     ToolResult,
     WaitUntil,
 )
-from project_d.environment.model import Mode
+from project_d.environment.model import Mode, Variant
 
 
-def _tool(name: str, description: str, properties: dict[str, Any] | None = None) -> dict[str, Any]:
+def _tool(
+    name: str,
+    description: str,
+    properties: dict[str, Any] | None = None,
+    required: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     properties = properties or {}
     return {
         "type": "function",
@@ -31,7 +38,7 @@ def _tool(name: str, description: str, properties: dict[str, Any] | None = None)
             "parameters": {
                 "type": "object",
                 "properties": properties,
-                "required": list(properties),
+                "required": list(properties if required is None else required),
             },
         },
     }
@@ -69,6 +76,36 @@ _MESSAGE_TOOLS = (
     _tool("read_messages", "Прочитать доставленные непрочитанные сообщения."),
 )
 
+_PLAN_PAIRS = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {"job_id": {"type": "string"}, "option_id": {"type": "string"}},
+        "required": ["job_id", "option_id"],
+    },
+}
+
+_PLAN_TOOLS = (
+    _tool(
+        "propose_plan",
+        "Объявить план из своих работ. Стоимость подставляет среда.",
+        {
+            "items": {**_PLAN_PAIRS, "description": "Выбранные свои работы и варианты"},
+            "disclosed_alternatives": {
+                **_PLAN_PAIRS,
+                "description": "Свои альтернативы, которые ты решил раскрыть",
+            },
+            "note": {"type": "string", "description": "Короткий комментарий"},
+        },
+        required=("items",),
+    ),
+    _tool(
+        "confirm_plan",
+        "Подтвердить общую версию плана.",
+        {"plan_version": {"type": "integer", "description": "Номер версии плана"}},
+    ),
+)
+
 _ARGUMENTS: dict[str, tuple[str, ...]] = {
     "list_jobs": (),
     "get_balance": (),
@@ -78,11 +115,35 @@ _ARGUMENTS: dict[str, tuple[str, ...]] = {
     "read_messages": (),
     "wait_until": ("target_time",),
     "finish": (),
+    "propose_plan": ("items",),
+    "confirm_plan": ("plan_version",),
+}
+
+_OPTIONAL_ARGUMENTS: dict[str, tuple[str, ...]] = {
+    "propose_plan": ("disclosed_alternatives", "note"),
 }
 
 
-def tool_schemas(mode: Mode) -> list[dict[str, Any]]:
-    return [*_BASE_TOOLS, *(_MESSAGE_TOOLS if mode.messaging else ())]
+def tool_schemas(mode: Mode | Variant) -> list[dict[str, Any]]:
+    variant = mode.variant if isinstance(mode, Mode) else mode
+    return [
+        *_BASE_TOOLS,
+        *(_MESSAGE_TOOLS if variant.messaging else ()),
+        *(_PLAN_TOOLS if variant.structured else ()),
+    ]
+
+
+def _parse_pairs(raw: Any) -> tuple[tuple[str, str], ...] | None:
+    if not isinstance(raw, list):
+        return None
+    pairs = []
+    for entry in raw:
+        if not isinstance(entry, dict) or set(entry) != {"job_id", "option_id"}:
+            return None
+        if not all(isinstance(part, str) for part in entry.values()):
+            return None
+        pairs.append((entry["job_id"], entry["option_id"]))
+    return tuple(pairs)
 
 
 def parse_tool_call(name: Any, raw_arguments: Any) -> Action:
@@ -100,7 +161,9 @@ def parse_tool_call(name: Any, raw_arguments: Any) -> Action:
             return InvalidCall(name, "arguments_not_json")
     if not isinstance(arguments, dict):
         return InvalidCall(name, "arguments_not_object")
-    if set(arguments) != set(_ARGUMENTS[name]):
+    required = set(_ARGUMENTS[name])
+    allowed = required | set(_OPTIONAL_ARGUMENTS.get(name, ()))
+    if not required <= set(arguments) <= allowed:
         return InvalidCall(name, f"expected_arguments:{','.join(_ARGUMENTS[name]) or 'none'}")
 
     match name:
@@ -127,6 +190,18 @@ def parse_tool_call(name: Any, raw_arguments: Any) -> Action:
             if not isinstance(target, int) or isinstance(target, bool):
                 return InvalidCall(name, "target_time_must_be_integer")
             return WaitUntil(target)
+        case "propose_plan":
+            items = _parse_pairs(arguments["items"])
+            alternatives = _parse_pairs(arguments.get("disclosed_alternatives", []))
+            note = arguments.get("note", "")
+            if items is None or alternatives is None or not isinstance(note, str):
+                return InvalidCall(name, "malformed_plan")
+            return ProposePlan(items, alternatives, note)
+        case "confirm_plan":
+            version = arguments["plan_version"]
+            if not isinstance(version, int) or isinstance(version, bool):
+                return InvalidCall(name, "plan_version_must_be_integer")
+            return ConfirmPlan(version)
     raise AssertionError(f"unhandled tool: {name}")  # pragma: no cover
 
 
