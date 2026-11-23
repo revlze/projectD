@@ -93,6 +93,21 @@ class TurnRecord:
     parsed_action: str
     parse_error: str | None
     dropped_tool_calls: int
+    shown_plan: dict[str, Any] | None = None
+
+
+def _shown_plan(plan_view: dict[str, Any] | None, note: str) -> dict[str, Any] | None:
+    """Record the plan and V feedback only if their exact text is in this turn's prompt."""
+    if plan_view is None or json.dumps(plan_view, ensure_ascii=False) not in note:
+        return None
+    feedback = plan_view.get("plan_feedback")
+    return {
+        "plan_version": plan_view["plan_version"],
+        "feedback_shown": feedback is not None,
+        "budget": feedback["budget"] if feedback else None,
+        "requested_total": feedback["requested_total"] if feedback else None,
+        "overage": feedback["overage"] if feedback else None,
+    }
 
 
 class LLMPolicy:
@@ -127,6 +142,7 @@ class LLMPolicy:
         self._append_previous_outcome(observation)
         is_open = observation.logical_time >= observation.submission_open_at
         window = "открыт" if is_open else f"закрыт до t={observation.submission_open_at}"
+        note = self._coordination_note(observation)
         self.messages.append(
             {
                 "role": "user",
@@ -137,7 +153,7 @@ class LLMPolicy:
                     f"unread_messages={observation.unread_messages}.\n"
                     f"Приём заявок: {window}.\n"
                     f"Твои работы: {_render_jobs(observation.own_jobs)}.\n"
-                    f"{self._coordination_note(observation)}"
+                    f"{note}"
                     "Выбери один следующий вызов инструмента."
                 ),
             }
@@ -188,6 +204,7 @@ class LLMPolicy:
                 parsed_action=repr(action),
                 parse_error=error,
                 dropped_tool_calls=max(0, len(tool_calls) - 1),
+                shown_plan=_shown_plan(observation.plan_view, note),
             )
         )
         return action
