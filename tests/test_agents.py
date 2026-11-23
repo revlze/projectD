@@ -300,3 +300,23 @@ def test_client_reports_unreachable_server() -> None:
     config = LLMConfig(base_url="http://127.0.0.1:9/v1", retries=0, timeout_s=1)
     with pytest.raises(LLMTransportError):
         OpenAICompatibleClient(config).chat([], [])
+
+
+def test_each_turn_shows_own_jobs_and_window_without_value() -> None:
+    client = AgentAwareClient({"A": [call("finish")], "B": [call("finish")]})
+    config = RunConfig(mode=Mode.B1, submission_open_at=13)
+    run_llm_episode(make_scenario(), config, client)
+    a_note = next(msgs for agent, msgs in client.requests if agent == "A")[-1]["content"]
+    assert "job_a [not_started]: full (стоимость 7)" in a_note
+    assert "закрыт до t=13" in a_note
+    assert "job_b" not in a_note
+    assert "value" not in a_note
+
+
+@pytest.mark.parametrize(("mode", "expected"), [(Mode.B0, False), (Mode.B1, True)])
+def test_coordination_reminder_only_with_messaging(mode: Mode, expected: bool) -> None:
+    client = AgentAwareClient({"A": [call("finish")], "B": [call("finish")]})
+    config = RunConfig(mode=mode, submission_open_at=13)
+    run_llm_episode(make_scenario(), config, client)
+    note = next(msgs for agent, msgs in client.requests if agent == "A")[-1]["content"]
+    assert ("ещё не отправил" in note) is expected

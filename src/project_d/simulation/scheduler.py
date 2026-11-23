@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
 from project_d.environment.actions import Action, Finish, ToolResult, WaitUntil
 from project_d.environment.env import Environment
@@ -22,6 +22,7 @@ class Observation:
     turns_remaining: int
     unread_messages: int
     last_result: ToolResult | None
+    own_jobs: tuple[dict[str, Any], ...] = ()
 
 
 class Policy(Protocol):
@@ -95,6 +96,7 @@ def run_episode(
                     turns_remaining=limit - turns[agent_id],
                     unread_messages=env.unread_count(agent_id),
                     last_result=last_results[agent_id],
+                    own_jobs=tuple(env.own_jobs(agent_id)),
                 )
             )
             for agent_id in ready

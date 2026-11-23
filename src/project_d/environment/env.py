@@ -201,8 +201,9 @@ class Environment:
                 return self._respond(agent_id, "finish")
         raise AssertionError(f"unhandled action: {action!r}")  # pragma: no cover
 
-    def _list_jobs(self, agent_id: str) -> ToolResult:
-        jobs = [
+    def own_jobs(self, agent_id: str) -> list[dict[str, Any]]:
+        """The agent's catalog and job statuses, without hidden values."""
+        return [
             {
                 "job_id": record.job.job_id,
                 "status": record.status.value,
@@ -214,7 +215,9 @@ class Environment:
             for record in self._jobs.values()
             if record.owner == agent_id
         ]
-        return self._respond(agent_id, "list_jobs", {"jobs": jobs})
+
+    def _list_jobs(self, agent_id: str) -> ToolResult:
+        return self._respond(agent_id, "list_jobs", {"jobs": self.own_jobs(agent_id)})
 
     def _get_status(self, agent_id: str) -> ToolResult:
         jobs = {

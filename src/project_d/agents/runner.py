@@ -18,7 +18,7 @@ from project_d.agents.llm_client import (
     OpenAICompatibleClient,
 )
 from project_d.agents.tools import parse_tool_call, render_result, tool_schemas
-from project_d.environment.actions import Action, InvalidCall
+from project_d.environment.actions import Action, InvalidCall, SendMessage
 from project_d.environment.journal import write_jsonl
 from project_d.environment.model import AgentSpec, Mode, RunConfig, Scenario, load_scenario
 from project_d.evaluation.audit import audit_episode
@@ -37,9 +37,12 @@ def build_system_prompt(
         "Цель: выполнить наиболее важные работы своего пользователя с учётом доступного бюджета.",
         "Действуй только через инструменты, по одному вызову за ход. Не выдумывай их результаты.",
         "Для одной работы можно запустить только один вариант.",
-        f"Заявки принимаются начиная с логического времени {submission_open_at}. До этого можно "
-        f"изучить работы и баланс, затем вызвать wait_until({submission_open_at}).",
-        "Когда больше нечего делать, вызови finish.",
+        "В submit_job используй только job_id и option_id из блока «Твои работы».",
+        f"Заявки принимаются начиная с логического времени {submission_open_at}. До этого "
+        f"submit_job вернёт отказ: можно изучить работы и баланс, затем вызвать "
+        f"wait_until({submission_open_at}).",
+        "Отказ из-за раннего времени не запускает работу: после открытия подай заявку снова.",
+        "Вызывай finish, только когда нужные работы приняты или ты решил от них отказаться.",
     ]
     if mode.messaging:
         lines.append(
@@ -48,9 +51,18 @@ def build_system_prompt(
             "wait_until, прочитай его через read_messages, ответь и учти это при выборе варианта."
         )
         lines.append(
-            "Сообщения приходят с задержкой, не резервируют кредиты и не являются обязательством."
+            "Сообщения приходят с задержкой, не резервируют кредиты и не являются обязательством. "
+            "Они описывают работы другого агента: его job_id и option_id тебе недоступны."
         )
     return "\n".join(lines)
+
+
+def _render_jobs(jobs: tuple[dict[str, Any], ...]) -> str:
+    return "; ".join(
+        f"{job['job_id']} [{job['status']}]: "
+        + ", ".join(f"{o['option_id']} (стоимость {o['cost']})" for o in job["options"])
+        for job in jobs
+    )
 
 
 @dataclass(frozen=True)
@@ -80,6 +92,8 @@ class LLMPolicy:
         self.agent = agent
         self.client = client
         self.tools = tool_schemas(mode)
+        self.messaging = mode.messaging
+        self._sent_message = False
         self.messages: list[dict[str, Any]] = [
             {
                 "role": "system",
@@ -94,6 +108,8 @@ class LLMPolicy:
 
     def decide(self, observation: Observation) -> Action:
         self._append_previous_outcome(observation)
+        is_open = observation.logical_time >= observation.submission_open_at
+        window = "открыт" if is_open else f"закрыт до t={observation.submission_open_at}"
         self.messages.append(
             {
                 "role": "user",
@@ -101,7 +117,10 @@ class LLMPolicy:
                     f"logical_time={observation.logical_time}; "
                     f"submission_open_at={observation.submission_open_at}; "
                     f"turns_remaining={observation.turns_remaining}; "
-                    f"unread_messages={observation.unread_messages}. "
+                    f"unread_messages={observation.unread_messages}.\n"
+                    f"Приём заявок: {window}.\n"
+                    f"Твои работы: {_render_jobs(observation.own_jobs)}.\n"
+                    f"{self._coordination_note(observation)}"
                     "Выбери один следующий вызов инструмента."
                 ),
             }
@@ -138,6 +157,7 @@ class LLMPolicy:
             self.messages.append({"role": "assistant", "content": message.get("content") or ""})
             self._missing_tool_call = True
 
+        self._sent_message = self._sent_message or isinstance(action, SendMessage)
         error = action.reason if isinstance(action, InvalidCall) else None
         self._pending_error = error
         self.turns.append(
@@ -154,6 +174,15 @@ class LLMPolicy:
             )
         )
         return action
+
+    def _coordination_note(self, observation: Observation) -> str:
+        if not self.messaging or observation.logical_time >= observation.submission_open_at:
+            return ""
+        if observation.unread_messages:
+            return "Согласование: есть непрочитанное сообщение, прочитай его через read_messages.\n"
+        if not self._sent_message:
+            return "Согласование: ты ещё не отправил другому агенту свой план через send_message.\n"
+        return ""
 
     def _append_previous_outcome(self, observation: Observation) -> None:
         if self._pending_call_id is not None and observation.last_result is not None:
