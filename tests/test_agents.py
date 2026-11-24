@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -12,6 +13,7 @@ from project_d.agents.llm_client import (
     LLMTransportError,
     OpenAICompatibleClient,
 )
+from project_d.agents.providers import provider_config
 from project_d.agents.runner import smoke_check
 from project_d.agents.tools import parse_tool_call
 from project_d.environment.actions import InvalidCall, SubmitJob, WaitUntil
@@ -37,10 +39,12 @@ def test_wait_parser_rejects_bad_types(arguments) -> None:
 class _Handler(BaseHTTPRequestHandler):
     payloads: ClassVar[list[dict]] = []
     statuses: ClassVar[list[int]] = []
+    auth: ClassVar[list[str | None]] = []
 
     def do_POST(self) -> None:
         length = int(self.headers["Content-Length"])
         type(self).payloads.append(json.loads(self.rfile.read(length)))
+        type(self).auth.append(self.headers.get("Authorization"))
         status = type(self).statuses.pop(0) if type(self).statuses else 200
         body = json.dumps(
             {
@@ -76,6 +80,7 @@ class _Handler(BaseHTTPRequestHandler):
 def server():
     _Handler.payloads = []
     _Handler.statuses = []
+    _Handler.auth = []
     httpd = HTTPServer(("127.0.0.1", 0), _Handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
@@ -113,3 +118,68 @@ def test_client_reports_unreachable_server() -> None:
     config = LLMConfig(base_url="http://127.0.0.1:9/v1", retries=0, timeout_s=1)
     with pytest.raises(LLMTransportError):
         OpenAICompatibleClient(config).chat([], [])
+
+
+def test_client_sends_key_from_environment(server: str, monkeypatch) -> None:
+    monkeypatch.setenv("TEST_PROVIDER_KEY", "secret")
+    config = LLMConfig(base_url=server, api_key_env="TEST_PROVIDER_KEY")
+    OpenAICompatibleClient(config).chat([], [])
+    assert _Handler.auth == ["Bearer secret"]
+    assert "secret" not in json.dumps(dataclasses.asdict(config))
+
+
+def test_client_requires_configured_key(server: str, monkeypatch) -> None:
+    monkeypatch.delenv("TEST_PROVIDER_KEY", raising=False)
+    config = LLMConfig(base_url=server, api_key_env="TEST_PROVIDER_KEY")
+    with pytest.raises(LLMTransportError, match="TEST_PROVIDER_KEY"):
+        OpenAICompatibleClient(config).chat([], [])
+    assert _Handler.payloads == []
+
+
+def test_local_client_sends_no_key(server: str) -> None:
+    OpenAICompatibleClient(LLMConfig(base_url=server)).chat([], [])
+    assert _Handler.auth == [None]
+
+
+def test_client_waits_out_rate_limits(server: str) -> None:
+    _Handler.statuses = [429, 429]
+    config = LLMConfig(base_url=server, retries=0, rate_limit_backoff_s=0)
+    assert OpenAICompatibleClient(config).chat([], []).usage["prompt_tokens"] == 5
+    assert len(_Handler.payloads) == 3
+
+
+def test_client_gives_up_on_persistent_rate_limit(server: str) -> None:
+    _Handler.statuses = [429, 429, 429]
+    config = LLMConfig(base_url=server, rate_limit_retries=2, rate_limit_backoff_s=0)
+    with pytest.raises(LLMTransportError, match="429"):
+        OpenAICompatibleClient(config).chat([], [])
+
+
+def test_mistral_profile_adapts_seed_and_call_ids() -> None:
+    config = provider_config("mistral", LLMConfig(seed=3))
+    history = [
+        {
+            "role": "assistant",
+            "content": "",
+            "tool_calls": [
+                {
+                    "id": "call_0_0",
+                    "type": "function",
+                    "function": {"name": "list_jobs", "arguments": "{}"},
+                }
+            ],
+        },
+        {"role": "tool", "tool_call_id": "call_0_0", "content": "{}"},
+    ]
+    payload = OpenAICompatibleClient(config).build_payload(history, [])
+    call_id = payload["messages"][0]["tool_calls"][0]["id"]
+    assert payload["random_seed"] == 3 and "seed" not in payload
+    assert payload["max_tokens"] == 2048
+    assert len(call_id) == 9 and call_id.isalnum()
+    assert payload["messages"][1]["tool_call_id"] == call_id
+    assert history[0]["tool_calls"][0]["id"] == "call_0_0"
+
+
+def test_ollama_profile_keeps_baseline_payload() -> None:
+    config = provider_config("ollama", LLMConfig(seed=3))
+    assert config == LLMConfig(seed=3)

@@ -151,3 +151,22 @@ def test_pending_vbc_and_duplicate_keys_are_rejected_before_any_request(tmp_path
                 specs, ROOT, tmp_path, lambda _: pytest.fail("No client creation"), run_identity={}
             )
     assert not list(tmp_path.iterdir())
+
+
+def test_parallel_workers_match_sequential_run(tmp_path):
+    specs = [replace(SPEC, repeat=r) for r in range(3)] + [replace(SPEC, variant="A/N")]
+    identity = {"model": "recording", "digest": "weights", "template": "template"}
+
+    def go(root: Path, workers: int):
+        return run_specs(
+            specs, ROOT, root, lambda _: RecordingClient(), run_identity=identity, workers=workers
+        )
+
+    sequential = go(tmp_path / "seq", 1)
+    parallel = go(tmp_path / "par", 4)
+    assert [r["episode"] for r in parallel] == [s.name for s in specs]
+    assert parallel == sequential
+    for spec in specs:
+        for suffix in ("log.jsonl", "llm.jsonl"):
+            name = f"{spec.name}.{suffix}"
+            assert file_sha256(tmp_path / "par" / name) == file_sha256(tmp_path / "seq" / name)

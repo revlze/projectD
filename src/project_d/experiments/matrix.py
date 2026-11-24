@@ -14,18 +14,20 @@ import sys
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Iterable
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from project_d.agents.llm_client import (
-    DEFAULT_BASE_URL,
     DEFAULT_MODEL,
     ChatClient,
     LLMConfig,
     OpenAICompatibleClient,
 )
 from project_d.agents.prompts import PROMPT_VERSION, build_protocol_prompt, prompt_sha256
+from project_d.agents.providers import PROVIDERS, is_local, provider_config
 from project_d.agents.runner import LLMEpisode, run_llm_episode, write_episode
 from project_d.agents.tools import tool_schemas
 from project_d.environment.actions import SubmitJob
@@ -342,9 +344,23 @@ def hardware() -> dict[str, Any]:
     return {"platform": platform.platform(), "gpu": gpu, "chip": chip}
 
 
-def run_manifest(llm: LLMConfig, base_seed: int, context_length: int) -> dict[str, Any]:
+def run_manifest(
+    llm: LLMConfig, base_seed: int, context_length: int | None, provider: str = "ollama"
+) -> dict[str, Any]:
     settings = asdict(llm)
     settings.pop("seed")
+    if not is_local(provider):
+        # Hosted weights cannot be pinned; record the provider and the date instead.
+        return {
+            "provider": provider,
+            "llm": settings,
+            "context_length": context_length,
+            "llm_base_seed": base_seed,
+            "started_utc": datetime.now(UTC).isoformat(timespec="seconds"),
+            "git_commit": _command_output("git", "rev-parse", "HEAD"),
+            "git_dirty": bool(_command_output("git", "status", "--porcelain")),
+            "prompt_version": PROMPT_VERSION,
+        }
     return {
         "llm": settings,
         "context_length": context_length,
@@ -369,6 +385,7 @@ def run_specs(
     context_length: int | None = None,
     *,
     run_identity: dict[str, Any],
+    workers: int = 1,
 ) -> list[dict[str, Any]]:
     """Resume only identical, complete episodes; preserve failed attempts before retrying."""
     if not specs or len({spec.name for spec in specs}) != len(specs):
@@ -422,21 +439,24 @@ def run_specs(
         "episodes": identities,
         "scenario_manifest_sha256": file_sha256(data_root / "manifest.json"),
     }
-    rows = []
     with RunStore(output_dir, identity) as store:
-        for index, spec in enumerate(specs, start=1):
-            saved = store.load(spec.name)
-            if saved is not None:
-                rows.append(saved)
-                continue
+        saved = {spec.name: store.load(spec.name) for spec in specs}
+        pending = [spec for spec in specs if saved[spec.name] is None]
+
+        def run_one(spec: EpisodeSpec) -> dict[str, Any]:
+            # Each episode writes only its own files, so episodes can run side by side.
             scenario = load_scenario(data_root / spec.profile)
             client = client_for_seed(base_seed + spec.repeat)
             episode = run_llm_episode(scenario, spec.run_config(scenario), client)
             write_episode(output_dir, spec.name, episode)
             row = summarize_episode(spec, scenario, episode, context_length)
             store.complete(spec.name, row)
-            rows.append(row)
-            print(f"[{index}/{len(specs)}] {spec.name}: {row.get('U_safe', 'failed')}", flush=True)
+            print(f"[{spec.name}] {row.get('U_safe', 'failed')}", flush=True)
+            return row
+
+        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+            done = dict(zip((s.name for s in pending), pool.map(run_one, pending), strict=True))
+        rows = [saved[spec.name] or done[spec.name] for spec in specs]
         _write_table(output_dir / "summary.csv", rows)
     return rows
 
@@ -493,8 +513,17 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("series", choices=("E0", *SERIES))
     parser.add_argument("--data-root", type=Path, default=DATA_ROOT)
     parser.add_argument("--output-dir", type=Path)
+    parser.add_argument("--provider", choices=tuple(PROVIDERS), default="ollama")
     parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
+    parser.add_argument("--base-url", help="Overrides the provider's endpoint")
+    parser.add_argument(
+        "--reasoning-effort",
+        default="none",
+        help='Sent as reasoning_effort; "omit" leaves the field out of the request',
+    )
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Episodes run in parallel within this process"
+    )
     parser.add_argument("--temperature", type=float, default=0.3)
     parser.add_argument("--llm-seed", type=int, default=0)
     parser.add_argument(
@@ -561,24 +590,34 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     verify_profiles(args.data_root, manifest, (spec.profile for spec in specs))
 
-    llm = LLMConfig(model=args.model, base_url=args.base_url, temperature=args.temperature)
-    actual_context = loaded_context_length(llm)
-    if actual_context != args.context_length:
-        print(
-            f"Server context is {actual_context}, expected {args.context_length}. Restart with "
-            f"OLLAMA_CONTEXT_LENGTH={args.context_length} ollama serve.",
-            file=sys.stderr,
-        )
-        return 2
-    runtime = run_manifest(llm, args.llm_seed, actual_context)
-    card = runtime["model_card"]
-    if (
-        not card
-        or not str(card.get("weights", "")).startswith("sha256-")
-        or not card.get("template")
-    ):
-        print("Cannot freeze the model weights and chat template from the server.", file=sys.stderr)
-        return 2
+    effort = None if args.reasoning_effort == "omit" else args.reasoning_effort
+    base = LLMConfig(model=args.model, temperature=args.temperature, reasoning_effort=effort)
+    llm = provider_config(args.provider, base, base_url=args.base_url)
+    if is_local(args.provider):
+        actual_context = loaded_context_length(llm)
+        if actual_context != args.context_length:
+            print(
+                f"Server context is {actual_context}, expected {args.context_length}. Restart "
+                f"with OLLAMA_CONTEXT_LENGTH={args.context_length} ollama serve.",
+                file=sys.stderr,
+            )
+            return 2
+        runtime = run_manifest(llm, args.llm_seed, actual_context)
+        card = runtime["model_card"]
+        if (
+            not card
+            or not str(card.get("weights", "")).startswith("sha256-")
+            or not card.get("template")
+        ):
+            print(
+                "Cannot freeze the model weights and chat template from the server.",
+                file=sys.stderr,
+            )
+            return 2
+    else:
+        # Hosted context windows exceed the episode budget; there is no server to query.
+        actual_context = None
+        runtime = run_manifest(llm, args.llm_seed, actual_context, args.provider)
     rows = run_specs(
         specs,
         args.data_root,
@@ -587,6 +626,7 @@ def main(argv: list[str] | None = None) -> int:
         args.llm_seed,
         actual_context,
         run_identity=runtime,
+        workers=args.workers,
     )
     failed = sum(row["failure"] is not None for row in rows)
     issues = sum(row.get("audit_issues", 0) for row in rows)
