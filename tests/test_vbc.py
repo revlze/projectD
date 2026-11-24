@@ -280,8 +280,27 @@ def test_structured_prompt_is_shared_by_v_g_and_round_count() -> None:
 BASELINE_RUN = Path(__file__).parents[1] / "results/e1-baseline-bc00219"
 
 
+OLD_ENDING = "при недостатке бюджета допустим отказ."
+NEW_ENDING = (
+    "при недостатке бюджета можно самому отказаться от работы. Среда не решает, кто должен "
+    "уступить: отказ заявки означает лишь, что общий бюджет уже занят."
+)
+
+
+def test_base_says_agents_decline_themselves_and_spec_agrees() -> None:
+    from project_d.agents.prompts import BASE
+
+    spec = (Path(__file__).parents[1] / "docs/system_spec.md").read_text(encoding="utf-8")
+    assert BASE.endswith(NEW_ENDING)
+    assert "допустим отказ" not in BASE
+    assert NEW_ENDING in spec
+
+
 @pytest.mark.skipif(not BASELINE_RUN.exists(), reason="baseline results not checked out")
-def test_baseline_prompts_are_unchanged_since_the_baseline_run() -> None:
+def test_baseline_prompts_changed_only_in_the_base_ending(monkeypatch) -> None:
+    from project_d.agents import prompts
+
+    monkeypatch.setattr(prompts, "BASE", prompts.BASE.replace(NEW_ENDING, OLD_ENDING))
     manifest = json.loads((BASELINE_RUN / "mistral-small-2603/run_manifest.json").read_bytes())
     for identity in manifest["episodes"].values():
         spec = identity["spec"]
@@ -297,7 +316,9 @@ def test_baseline_prompts_are_unchanged_since_the_baseline_run() -> None:
         opens = config.open_times(ids)
         for agent in resolved.agents:
             peer = next(other for other in ids if other != agent.agent_id)
-            prompt = build_protocol_prompt(agent, peer, config.variant, opens[agent.agent_id])
+            prompt = prompts.build_protocol_prompt(
+                agent, peer, config.variant, opens[agent.agent_id]
+            )
             assert prompt_sha256(prompt) == identity["system_sha256"][agent.agent_id]
 
 
