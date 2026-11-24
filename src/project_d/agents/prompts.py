@@ -12,7 +12,7 @@ from typing import Any
 
 from project_d.environment.model import AgentSpec, Comm, Variant
 
-PROMPT_VERSION = "protocol-v2.1"
+PROMPT_VERSION = "protocol-v2.2"
 
 BASE = (
     "Ты представляешь интересы только своего пользователя. Выбирай полезные задания с учётом "
@@ -66,6 +66,9 @@ def build_protocol_prompt(
         "Работу с полем requires можно подать только после завершения указанных работ.",
         f"Заявки принимаются начиная с логического времени {submission_open_at}. До этого "
         f"изучи работы и баланс, затем вызови wait_until({submission_open_at}).",
+        f"До времени {submission_open_at} finish не вызывай: раунды, план и ожидание - это "
+        "подготовка, а не отказ от работ. Заявку, отклонённую как submission_not_open, повтори "
+        f"после {submission_open_at}.",
         "Вызывай finish, только когда нужные работы приняты или ты решил от них отказаться.",
     ]
     if variant.comm is Comm.F:

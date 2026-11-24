@@ -30,3 +30,15 @@ def test_notes_never_recommend_who_yields() -> None:
         note = protocol_note(phase, (), PLAN, "B").lower()
         assert "уступ" not in note
         assert "value" not in note
+
+
+def test_protocol_prompt_forbids_finishing_before_submission_opens() -> None:
+    from project_d.agents.prompts import build_protocol_prompt
+    from project_d.environment.model import Variant
+    from support import make_scenario
+
+    agent = make_scenario().agents[0]
+    for variant in ("U/N", "U/F", "A/R3", "A/VBC"):
+        prompt = build_protocol_prompt(agent, "B", Variant.parse(variant), 40)
+        assert "До времени 40 finish не вызывай" in prompt
+        assert "submission_not_open, повтори после 40" in prompt
