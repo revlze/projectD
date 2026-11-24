@@ -66,7 +66,7 @@ class RecordingClient:
             return response("send_message", {"agent_id": peer, "text": f"intent-{agent}-{now}"})
         if jobs is None:
             return response("list_jobs")
-        if not any("budget" in item for item in results):
+        if not any("shared_budget" in item for item in results):
             return response("get_balance")
         if now < opens:
             if any(tool["function"]["name"] == "send_message" for tool in tools) and now == 2:

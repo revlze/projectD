@@ -302,7 +302,12 @@ class Environment:
                 return self._respond(
                     agent_id,
                     "get_balance",
-                    {"budget": self.scenario.budget, "available": self.available},
+                    # One pool for both agents; the field names say so (decision D02).
+                    {
+                        "shared_budget": self.scenario.budget,
+                        "shared_available": self.available,
+                        "shared_with": [a for a in self.processing_order if a != agent_id],
+                    },
                 )
             case SubmitJob():
                 return self._submit(agent_id, action)

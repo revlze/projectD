@@ -173,7 +173,8 @@ def test_list_jobs_hides_value_and_foreign_jobs() -> None:
 def test_status_and_balance_are_visible_to_agent() -> None:
     env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
     env.execute("A", SUBMIT_A)
-    assert env.execute("B", GetBalance()).data["available"] == 5
+    balance = env.execute("B", GetBalance()).data
+    assert (balance["shared_available"], balance["shared_with"]) == (5, ["A"])
     status = env.execute("A", GetStatus())
     assert status.data["jobs"]["job_a"]["status"] == "pending"
     assert status.data["last_request"]["result"] == "accepted"
