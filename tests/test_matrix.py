@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from project_d.agents.llm_client import ChatResponse
+from project_d.agents.llm_client import ChatResponse, LLMConfig
 from project_d.agents.prompts import PROMPT_VERSION
 from project_d.experiments.matrix import (
     DATA_ROOT,
@@ -13,6 +13,7 @@ from project_d.experiments.matrix import (
     load_manifest,
     main,
     run_e0,
+    run_manifest,
     run_specs,
     verify_profiles,
 )
@@ -86,3 +87,11 @@ def test_e0_table(tmp_path: Path) -> None:
     assert not any(r["audit_issues"] for r in rows)
     assert not any(r["violated"] for r in rows if r["mode"] == "B2")
     assert any(r["violated"] for r in rows if r["mode"] == "B0")
+
+
+def test_manifest_names_the_hardware_and_server_settings(monkeypatch) -> None:
+    monkeypatch.setenv("OLLAMA_KV_CACHE_TYPE", "q8_0")
+    manifest = run_manifest(LLMConfig(base_url="http://127.0.0.1:9/v1"), 0, 16384)
+    assert set(manifest["hardware"]) == {"platform", "gpu", "chip"}
+    assert manifest["hardware"]["platform"]
+    assert manifest["ollama_env"]["OLLAMA_KV_CACHE_TYPE"] == "q8_0"

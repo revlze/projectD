@@ -7,6 +7,8 @@ import csv
 import hashlib
 import itertools
 import json
+import os
+import platform
 import subprocess
 import sys
 import urllib.error
@@ -279,6 +281,18 @@ def loaded_context_length(llm: LLMConfig) -> int | None:
     return next((m.get("context_length") for m in models if m.get("name") == llm.model), None)
 
 
+SERVER_ENV = ("OLLAMA_CONTEXT_LENGTH", "OLLAMA_FLASH_ATTENTION", "OLLAMA_KV_CACHE_TYPE")
+
+
+def hardware() -> dict[str, Any]:
+    """Name the machine, since CUDA and Metal sample different tokens from the same seed."""
+    gpu = _command_output(
+        "nvidia-smi", "--query-gpu=name,memory.total,driver_version", "--format=csv,noheader"
+    )
+    chip = None if gpu else _command_output("sysctl", "-n", "machdep.cpu.brand_string")
+    return {"platform": platform.platform(), "gpu": gpu, "chip": chip}
+
+
 def run_manifest(llm: LLMConfig, base_seed: int, context_length: int) -> dict[str, Any]:
     settings = asdict(llm)
     settings.pop("seed")
@@ -287,6 +301,9 @@ def run_manifest(llm: LLMConfig, base_seed: int, context_length: int) -> dict[st
         "context_length": context_length,
         "llm_base_seed": base_seed,
         "server_version": _server_version(llm.base_url),
+        "hardware": hardware(),
+        # Only meaningful when the server shares this environment, as on a vast.ai pod.
+        "ollama_env": {name: os.environ.get(name) for name in SERVER_ENV},
         "git_commit": _command_output("git", "rev-parse", "HEAD"),
         "git_dirty": bool(_command_output("git", "status", "--porcelain")),
     }
