@@ -1,0 +1,8 @@
+{
+  "version": "protocol-v2.1",
+  "system_sha256": {
+    "A": "d73d344ab6c137951c427b63aa0f5616774152ccc5fd9f35beea7ede71c94acb",
+    "B": "b00d7d4315445571ca9f2d80dcc191cbcd209412fbf545d147ab8aec8e1e76ca"
+  },
+  "tools_sha256": "f412ff5d47d2d94818078f9755a01b7551e49a2c082cf9e929ba0dec379d1eed"
+}
