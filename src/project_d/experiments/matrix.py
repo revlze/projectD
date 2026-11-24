@@ -281,7 +281,12 @@ def loaded_context_length(llm: LLMConfig) -> int | None:
     return next((m.get("context_length") for m in models if m.get("name") == llm.model), None)
 
 
-SERVER_ENV = ("OLLAMA_CONTEXT_LENGTH", "OLLAMA_FLASH_ATTENTION", "OLLAMA_KV_CACHE_TYPE")
+SERVER_ENV = (
+    "OLLAMA_CONTEXT_LENGTH",
+    "OLLAMA_FLASH_ATTENTION",
+    "OLLAMA_KV_CACHE_TYPE",
+    "OLLAMA_NUM_PARALLEL",
+)
 
 
 def hardware() -> dict[str, Any]:
