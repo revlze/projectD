@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from project_d.agents.prompts import protocol_note
+import re
+from pathlib import Path
+
+from project_d.agents.prompts import (
+    BASE,
+    BUDGET_CHECK_INSTRUCTION,
+    ROUND_INSTRUCTION,
+    free_coordination,
+    protocol_note,
+)
 
 PLAN = {"plan_version": 2, "proposals": {}}
 
@@ -42,3 +51,18 @@ def test_protocol_prompt_forbids_finishing_before_submission_opens() -> None:
         prompt = build_protocol_prompt(agent, "B", Variant.parse(variant), 40)
         assert "До времени 40 finish не вызывай" in prompt
         assert "submission_not_open, повтори после 40" in prompt
+
+
+def test_prompt_fragments_match_approved_specification() -> None:
+    spec = (Path(__file__).parents[1] / "docs/system_spec.md").read_text(encoding="utf-8")
+    for label, actual in (
+        ("BASE", BASE),
+        ("F", free_coordination("B")[1]),
+        ("R1", ROUND_INSTRUCTION),
+        ("R3P", BUDGET_CHECK_INSTRUCTION),
+    ):
+        line = next(line for line in spec.splitlines() if line.startswith(f"**`{label}`"))
+        approved = re.search(r'"([^"]+)"', line).group(1)
+        assert actual.startswith(approved)
+    assert BASE.index("До планирования вызови list_jobs") < BASE.index("затем get_balance")
+    assert "обязательно согласуй план" not in free_coordination("B")[1]

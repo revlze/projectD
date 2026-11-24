@@ -181,12 +181,15 @@ def context_problem(episode: LLMEpisode, context_length: int | None) -> str | No
         for tokens in by_agent.values()
         for before, after in itertools.pairwise(tokens)
     )
+    warnings = []
     if drops:
-        return f"context_usage_drop: prompt size fell {drops} times; phase tool sets can shrink"
+        warnings.append(
+            f"context_usage_drop: prompt size fell {drops} times; phase tool sets can shrink"
+        )
     largest = max((max(tokens) for tokens in by_agent.values()), default=0)
     if context_length is not None and largest >= CONTEXT_SAFETY * context_length:
-        return f"context_limit: prompt reached {largest} of {context_length} tokens"
-    return None
+        warnings.append(f"context_limit: prompt reached {largest} of {context_length} tokens")
+    return "; ".join(warnings) or None
 
 
 def summarize_episode(
@@ -213,6 +216,7 @@ def summarize_episode(
         ),
         "llm_turns": len(episode.turns),
         "parse_errors": sum(turn.parse_error is not None for turn in episode.turns),
+        "length_finishes": sum(turn.finish_reason == "length" for turn in episode.turns),
         "prompt_tokens": sum(turn.usage.get("prompt_tokens", 0) for turn in episode.turns),
         "completion_tokens": sum(turn.usage.get("completion_tokens", 0) for turn in episode.turns),
         "llm_seconds": round(sum(turn.latency_s for turn in episode.turns), 3),

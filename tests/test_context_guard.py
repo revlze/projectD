@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from project_d.agents.runner import LLMEpisode, TurnRecord
-from project_d.experiments.matrix import context_problem
+from project_d.experiments.matrix import EpisodeSpec, context_problem, summarize_episode
+from support import make_scenario
 
 
 def episode(*tokens: tuple[str, int]) -> LLMEpisode:
@@ -28,3 +31,16 @@ def test_agents_are_compared_separately() -> None:
 def test_prompt_near_limit_is_flagged() -> None:
     problem = context_problem(episode(("A", 15000)), 16384)
     assert problem is not None and problem.startswith("context_limit")
+
+
+def test_usage_drop_does_not_hide_context_limit_or_length_finish() -> None:
+    diagnostic = episode(("A", 15500), ("A", 15000))
+    diagnostic.turns[-1] = replace(diagnostic.turns[-1], finish_reason="length")
+    warning = context_problem(diagnostic, 16384)
+    assert "context_usage_drop" in warning and "context_limit" in warning
+    row = summarize_episode(
+        EpisodeSpec("E1", "dev/dev_s0_01.json", "A/N", 0), make_scenario(), diagnostic, 16384
+    )
+    assert row["length_finishes"] == 1
+    assert row["failure"] is None
+    assert row["context_warning"] == warning

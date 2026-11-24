@@ -41,6 +41,28 @@ def test_dev_series_never_uses_test_profiles() -> None:
     assert {s.split for s in build_matrix("E1", load_manifest(ROOT))} == {"dev"}
 
 
+def test_diagnostic_selection_has_exactly_fifty_episodes(capsys) -> None:
+    profiles = ",".join(f"dev_s{family}_01" for family in range(5))
+    assert (
+        main(
+            [
+                "E1",
+                "--data-root",
+                str(ROOT),
+                "--profiles",
+                profiles,
+                "--variants",
+                "A/N,A/F,A/R1,A/R3,A/R3P",
+                "--repeats",
+                "2",
+                "--dry-run",
+            ]
+        )
+        == 0
+    )
+    assert json.loads(capsys.readouterr().out)["episodes"] == 50
+
+
 def test_test_split_requires_explicit_full_run(capsys) -> None:
     assert main(["E2", "--data-root", str(ROOT)]) == 2
     assert main(["E2", "--data-root", str(ROOT), "--allow-test", "--repeats", "1"]) == 2
