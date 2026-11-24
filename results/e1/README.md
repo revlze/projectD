@@ -4,7 +4,7 @@
 
 All episodes share one setup (see `g*/run_manifest.json`, identical in all four groups):
 
-- code `fcca9f7`, clean tree, prompt `protocol-v2.2`;
+- code `fcca9f7` (tag `e1-dev-run`; after the rebase into `master` the same code has another hash), clean tree, prompt `protocol-v2.2`;
 - Ollama 0.40.17, model `qwen3-4b-t8:latest` = weights `sha256-85e4a5b7...` of `qwen3:4b-instruct-2507-q4_K_M` plus `num_thread 8`;
 - context 16384, flash attention, KV cache `q8_0`, `OLLAMA_NUM_PARALLEL=8`, temperature 0.3, llm seed = repeat;
 - one RTX 3090 (vast.ai), four runner processes in parallel.
@@ -17,4 +17,4 @@ Files:
 
 Known caveat: on every turn the runner shows the agent its own jobs with status and option costs (`runner.py:155`), while the spec says costs come from `list_jobs()`. The block is identical in all variants. Open question with Seva, 2026-11-24.
 
-The earlier `results/e1_baselines` run (prompt v2.1, Apple M5) is not comparable with this one and is not used.
+The earlier v2.1 baseline run on an Apple M5 is not comparable with this one and was removed from `results/` (it stays in git history, commit `5117ba0`).
