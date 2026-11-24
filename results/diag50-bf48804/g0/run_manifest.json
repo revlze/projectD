@@ -1,0 +1,2092 @@
+{
+  "schema_version": 1,
+  "runtime": {
+    "llm": {
+      "model": "qwen3-4b-t8:latest",
+      "base_url": "http://localhost:11434/v1",
+      "temperature": 0.3,
+      "max_tokens": 512,
+      "reasoning_effort": "none",
+      "timeout_s": 300.0,
+      "retries": 2,
+      "retry_backoff_s": 1.0
+    },
+    "context_length": 16384,
+    "llm_base_seed": 0,
+    "server_version": "0.40.17",
+    "model_card": {
+      "weights": "sha256-85e4a5b7b8ef0e48af0e8658f5aaab9c2324c76c1641493f4d1e25fce54b18b9",
+      "parameters": "stop                           \"<|im_start|>\"\nstop                           \"<|im_end|>\"\ntemperature                    0.7\ntop_k                          20\ntop_p                          0.8\nnum_thread                     8\nrepeat_penalty                 1",
+      "template": "{%- if tools %}\n    {{- '<|im_start|>system\\n' }}\n    {%- if messages[0].role == 'system' %}\n        {{- messages[0].content + '\\n\\n' }}\n    {%- endif %}\n    {{- \"# Tools\\n\\nYou may call one or more functions to assist with the user query.\\n\\nYou are provided with function signatures within <tools></tools> XML tags:\\n<tools>\" }}\n    {%- for tool in tools %}\n        {{- \"\\n\" }}\n        {{- tool | tojson }}\n    {%- endfor %}\n    {{- \"\\n</tools>\\n\\nFor each function call, return a json object with function name and arguments within <tool_call></tool_call> XML tags:\\n<tool_call>\\n{\\\"name\\\": <function-name>, \\\"arguments\\\": <args-json-object>}\\n</tool_call><|im_end|>\\n\" }}\n{%- else %}\n    {%- if messages[0].role == 'system' %}\n        {{- '<|im_start|>system\\n' + messages[0].content + '<|im_end|>\\n' }}\n    {%- endif %}\n{%- endif %}\n{%- set ns = namespace(multi_step_tool=true, last_query_index=messages|length - 1) %}\n{%- for message in messages[::-1] %}\n    {%- set index = (messages|length - 1) - loop.index0 %}\n    {%- if ns.multi_step_tool and message.role == \"user\" and message.content is string and not(message.content.startswith('<tool_response>') and message.content.endswith('</tool_response>')) %}\n        {%- set ns.multi_step_tool = false %}\n        {%- set ns.last_query_index = index %}\n    {%- endif %}\n{%- endfor %}\n{%- for message in messages %}\n    {%- if message.content is string %}\n        {%- set content = message.content %}\n    {%- else %}\n        {%- set content = '' %}\n    {%- endif %}\n    {%- if (message.role == \"user\") or (message.role == \"system\" and not loop.first) %}\n        {{- '<|im_start|>' + message.role + '\\n' + content + '<|im_end|>' + '\\n' }}\n    {%- elif message.role == \"assistant\" %}\n        {%- set reasoning_content = '' %}\n        {%- if message.reasoning_content is string %}\n            {%- set reasoning_content = message.reasoning_content %}\n        {%- else %}\n            {%- if '</think>' in content %}\n                {%- set reasoning_content = content.split('</think>')[0].rstrip('\\n').split('<think>')[-1].lstrip('\\n') %}\n                {%- set content = content.split('</think>')[-1].lstrip('\\n') %}\n            {%- endif %}\n        {%- endif %}\n        {%- if loop.index0 > ns.last_query_index %}\n            {%- if loop.last or (not loop.last and reasoning_content) %}\n                {{- '<|im_start|>' + message.role + '\\n<think>\\n' + reasoning_content.strip('\\n') + '\\n</think>\\n\\n' + content.lstrip('\\n') }}\n            {%- else %}\n                {{- '<|im_start|>' + message.role + '\\n' + content }}\n            {%- endif %}\n        {%- else %}\n            {{- '<|im_start|>' + message.role + '\\n' + content }}\n        {%- endif %}\n        {%- if message.tool_calls %}\n            {%- for tool_call in message.tool_calls %}\n                {%- if (loop.first and content) or (not loop.first) %}\n                    {{- '\\n' }}\n                {%- endif %}\n                {%- if tool_call.function %}\n                    {%- set tool_call = tool_call.function %}\n                {%- endif %}\n                {{- '<tool_call>\\n{\"name\": \"' }}\n                {{- tool_call.name }}\n                {{- '\", \"arguments\": ' }}\n                {%- if tool_call.arguments is string %}\n                    {{- tool_call.arguments }}\n                {%- else %}\n                    {{- tool_call.arguments | tojson }}\n                {%- endif %}\n                {{- '}\\n</tool_call>' }}\n            {%- endfor %}\n        {%- endif %}\n        {{- '<|im_end|>\\n' }}\n    {%- elif message.role == \"tool\" %}\n        {%- if loop.first or (messages[loop.index0 - 1].role != \"tool\") %}\n            {{- '<|im_start|>user' }}\n        {%- endif %}\n        {{- '\\n<tool_response>\\n' }}\n        {{- content }}\n        {{- '\\n</tool_response>' }}\n        {%- if loop.last or (messages[loop.index0 + 1].role != \"tool\") %}\n            {{- '<|im_end|>\\n' }}\n        {%- endif %}\n    {%- endif %}\n{%- endfor %}\n{%- if add_generation_prompt %}\n    {{- '<|im_start|>assistant\\n' }}\n{%- endif %}",
+      "details": {
+        "parent_model": "sha256-85e4a5b7b8ef0e48af0e8658f5aaab9c2324c76c1641493f4d1e25fce54b18b9",
+        "format": "gguf",
+        "family": "qwen3",
+        "families": [
+          "qwen3"
+        ],
+        "parameter_size": "4.0B",
+        "quantization_level": "Q4_K_M",
+        "runner": "llamacpp"
+      }
+    },
+    "hardware": {
+      "platform": "Linux-6.8.0-138-generic-x86_64-with-glibc2.39",
+      "gpu": "NVIDIA GeForce RTX 3090, 24576 MiB, 595.99.02",
+      "chip": null
+    },
+    "ollama_env": {
+      "OLLAMA_CONTEXT_LENGTH": "16384",
+      "OLLAMA_FLASH_ATTENTION": "1",
+      "OLLAMA_KV_CACHE_TYPE": "q8_0",
+      "OLLAMA_NUM_PARALLEL": "8"
+    },
+    "git_commit": "bf48804c5ea558de62ad1eabd508a8ae18ae4203",
+    "git_dirty": false,
+    "prompt_version": "baseline-phases-2"
+  },
+  "source_sha256": {
+    "__init__.py": "632af8736e83a76c3e67558e527f0c853a8c5705d6b86d434eb86bdc7f3ced0c",
+    "agents/__init__.py": "e313aa2c8b18a319cf3a336ecdf0aaf2774fddde7f0a1dd94b2c127cf84f4222",
+    "agents/llm_client.py": "b4cf0ac32d985eabfe913942a9b0391b69125b96609f63211a58d6e6bb681f5a",
+    "agents/prompts.py": "aa9c1f2858e94999598bc36109397b52af991ab49a4afbf35273eb0033d82b15",
+    "agents/runner.py": "e647e399b6eb187e8cfc7acdd4acee80656a239ffc93101bf56fa4dc54dd57dc",
+    "agents/tools.py": "3fb59c196b9ba99e73d1b650883527a007e098979d8cd2ca51bb16d5e2ec1686",
+    "environment/__init__.py": "b8b3139c5ccf6e4de9bca70d8c8ffda9e3027a84804611a1cafe06232536e787",
+    "environment/actions.py": "99f6aecaf05b822e5f45a120705dad29f1ead3c2b078b6b44fec72d9eaffb29e",
+    "environment/env.py": "19ca997bcf085d3827b906be9a9786b41849ec788f5f172227f40ef1aeb8ce22",
+    "environment/journal.py": "7ab00b85297ac3662ad4eef539b4fa9de29471f4a8ee6bbb7f1f34aaa71ffe98",
+    "environment/model.py": "003196f4960824183c09911e1948474f1cf956782db91ab256420c3601d6ad8b",
+    "evaluation/__init__.py": "e1d551ce183739ad15b0b86666c07ae9d57d6dfe096c6d59b40868d119d71a9b",
+    "evaluation/audit.py": "2aa85b1515d7a43b60b8e9868bb1a8ebde3dc228e726cbf748b790110afbfd67",
+    "evaluation/metrics.py": "a46280837e506f3d3384e3708549684cf45c5b9a61669ff41fed81c8b02c7dbb",
+    "experiments/__init__.py": "1bdd1927531ee932d99d70d50af67018af80a5e1a6d06f1cb496bb265319c1df",
+    "experiments/generator.py": "e9df4a31e755549ded6e7630b1b6c49a1830e83207c33cbf07a395fc29cbd802",
+    "experiments/matrix.py": "b73c30b2168010cd3980beef9e6d17436f2322789aa937804d50e5bd33ae4f14",
+    "experiments/storage.py": "3e09cb75d7cd0f694c4e3fc4cb94cb1efb695f429b6aa7e657f47a494a90ea37",
+    "simulation/__init__.py": "a5df3d1b4a453f4dbe1b811364b223df134f51e1fabbe32c407f074f69886733",
+    "simulation/events.py": "99fad7a0bb76faf05a599af6d83acb87375e2fdb6bed68600be48963e83fa7dd",
+    "simulation/scheduler.py": "076b861179825789c6b89c1aae3f8898215284748a1a14bdfed1451a618b864e"
+  },
+  "prompt_version": "baseline-phases-2",
+  "context_length": 16384,
+  "episodes": {
+    "E1__dev_s0_01__A-N__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s0_01.json",
+        "variant": "A/N",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "982d05f08704caeecb0e137ac533d9eba8445a0e1987b474e443f5cdd575c7f9",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051
+      },
+      "metadata": {
+        "scenario_id": "dev_s0_01",
+        "mode": "A/N",
+        "budget": 28,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s0_01__A-N__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s0_01.json",
+        "variant": "A/N",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "982d05f08704caeecb0e137ac533d9eba8445a0e1987b474e443f5cdd575c7f9",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051
+      },
+      "metadata": {
+        "scenario_id": "dev_s0_01",
+        "mode": "A/N",
+        "budget": 28,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s0_01__A-F__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s0_01.json",
+        "variant": "A/F",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "982d05f08704caeecb0e137ac533d9eba8445a0e1987b474e443f5cdd575c7f9",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051
+      },
+      "metadata": {
+        "scenario_id": "dev_s0_01",
+        "mode": "A/F",
+        "budget": 28,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s0_01__A-F__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s0_01.json",
+        "variant": "A/F",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "982d05f08704caeecb0e137ac533d9eba8445a0e1987b474e443f5cdd575c7f9",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051
+      },
+      "metadata": {
+        "scenario_id": "dev_s0_01",
+        "mode": "A/F",
+        "budget": 28,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 317149051,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s1_01__A-N__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s1_01.json",
+        "variant": "A/N",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "521f09b2008e2254244cdc5d8fb76b56f2d7c32903780058cc49fdbe025aa94a",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289
+      },
+      "metadata": {
+        "scenario_id": "dev_s1_01",
+        "mode": "A/N",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              },
+              "short": {
+                "cost": 1,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s1_01__A-N__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s1_01.json",
+        "variant": "A/N",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "521f09b2008e2254244cdc5d8fb76b56f2d7c32903780058cc49fdbe025aa94a",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289
+      },
+      "metadata": {
+        "scenario_id": "dev_s1_01",
+        "mode": "A/N",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              },
+              "short": {
+                "cost": 1,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s1_01__A-F__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s1_01.json",
+        "variant": "A/F",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "521f09b2008e2254244cdc5d8fb76b56f2d7c32903780058cc49fdbe025aa94a",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289
+      },
+      "metadata": {
+        "scenario_id": "dev_s1_01",
+        "mode": "A/F",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              },
+              "short": {
+                "cost": 1,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s1_01__A-F__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s1_01.json",
+        "variant": "A/F",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "521f09b2008e2254244cdc5d8fb76b56f2d7c32903780058cc49fdbe025aa94a",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289
+      },
+      "metadata": {
+        "scenario_id": "dev_s1_01",
+        "mode": "A/F",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1759873289,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 4
+              },
+              "short": {
+                "cost": 1,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s2_01__A-N__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s2_01.json",
+        "variant": "A/N",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "1917ec841048937985cc7e592ebbd10fa87b4c6847baac3de3c8146ad28b6186",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201
+      },
+      "metadata": {
+        "scenario_id": "dev_s2_01",
+        "mode": "A/N",
+        "budget": 20,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {},
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 6
+              },
+              "short": {
+                "cost": 8,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 6
+              },
+              "medium": {
+                "cost": 2,
+                "duration": 6
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s2_01__A-N__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s2_01.json",
+        "variant": "A/N",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "1917ec841048937985cc7e592ebbd10fa87b4c6847baac3de3c8146ad28b6186",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201
+      },
+      "metadata": {
+        "scenario_id": "dev_s2_01",
+        "mode": "A/N",
+        "budget": 20,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {},
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 6
+              },
+              "short": {
+                "cost": 8,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 6
+              },
+              "medium": {
+                "cost": 2,
+                "duration": 6
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s2_01__A-F__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s2_01.json",
+        "variant": "A/F",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "1917ec841048937985cc7e592ebbd10fa87b4c6847baac3de3c8146ad28b6186",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201
+      },
+      "metadata": {
+        "scenario_id": "dev_s2_01",
+        "mode": "A/F",
+        "budget": 20,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {},
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 6
+              },
+              "short": {
+                "cost": 8,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 6
+              },
+              "medium": {
+                "cost": 2,
+                "duration": 6
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s2_01__A-F__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s2_01.json",
+        "variant": "A/F",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "1917ec841048937985cc7e592ebbd10fa87b4c6847baac3de3c8146ad28b6186",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201
+      },
+      "metadata": {
+        "scenario_id": "dev_s2_01",
+        "mode": "A/F",
+        "budget": 20,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 3853121201,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {},
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 13,
+                "duration": 6
+              },
+              "short": {
+                "cost": 8,
+                "duration": 5
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 6
+              },
+              "medium": {
+                "cost": 2,
+                "duration": 6
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s3_01__A-N__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s3_01.json",
+        "variant": "A/N",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "fec9effd1f6ef1c4e8ac18bed365b515f15aa993c7927a569f0631d3fe5c0273",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556
+      },
+      "metadata": {
+        "scenario_id": "dev_s3_01",
+        "mode": "A/N",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s3_01__A-N__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s3_01.json",
+        "variant": "A/N",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "fec9effd1f6ef1c4e8ac18bed365b515f15aa993c7927a569f0631d3fe5c0273",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556
+      },
+      "metadata": {
+        "scenario_id": "dev_s3_01",
+        "mode": "A/N",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s3_01__A-F__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s3_01.json",
+        "variant": "A/F",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "fec9effd1f6ef1c4e8ac18bed365b515f15aa993c7927a569f0631d3fe5c0273",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556
+      },
+      "metadata": {
+        "scenario_id": "dev_s3_01",
+        "mode": "A/F",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s3_01__A-F__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s3_01.json",
+        "variant": "A/F",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "fec9effd1f6ef1c4e8ac18bed365b515f15aa993c7927a569f0631d3fe5c0273",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556
+      },
+      "metadata": {
+        "scenario_id": "dev_s3_01",
+        "mode": "A/F",
+        "budget": 24,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 1734598556,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 14,
+                "duration": 4
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 11,
+                "duration": 6
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 5
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s4_01__A-N__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s4_01.json",
+        "variant": "A/N",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "aaee247f05b87e291643767e94e156d43b6c1abe58f51d69f5913038413b3f0c",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613
+      },
+      "metadata": {
+        "scenario_id": "dev_s4_01",
+        "mode": "A/N",
+        "budget": 21,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 7,
+                "duration": 3
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 8,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 3
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s4_01__A-N__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s4_01.json",
+        "variant": "A/N",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "aaee247f05b87e291643767e94e156d43b6c1abe58f51d69f5913038413b3f0c",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "N",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613
+      },
+      "metadata": {
+        "scenario_id": "dev_s4_01",
+        "mode": "A/N",
+        "budget": 21,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/N",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 7,
+                "duration": 3
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 8,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 3
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "f399904ec95023a80228ce5e86e24bfb461b0d760297a29fa0ca794ee2e56fc9",
+        "B": "b584100ce4dda1b7d069be4bdf67586999e33c617d2e8b03a4b30b183104d765"
+      },
+      "tools_sha256": {
+        "preparation": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "message_round": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "execution_wait": "a05200b02ef6a0ed3a13f20af5875db969bf0e2bec8ba9de58f16abd3e4f22f5",
+        "execution": "0efc5a58c6d0590dec29ccd72d5af065361aae6dad533e2a34c098e470fe64dc"
+      }
+    },
+    "E1__dev_s4_01__A-F__r0": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s4_01.json",
+        "variant": "A/F",
+        "repeat": 0,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 0,
+      "scenario_sha256": "aaee247f05b87e291643767e94e156d43b6c1abe58f51d69f5913038413b3f0c",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "A",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613
+      },
+      "metadata": {
+        "scenario_id": "dev_s4_01",
+        "mode": "A/F",
+        "budget": 21,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613,
+        "first_agent": "A",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 7,
+                "duration": 3
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 8,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 3
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    },
+    "E1__dev_s4_01__A-F__r1": {
+      "spec": {
+        "series": "E1",
+        "profile": "dev/dev_s4_01.json",
+        "variant": "A/F",
+        "repeat": 1,
+        "commit_delay": null,
+        "start_gap": 0,
+        "message_delay": null
+      },
+      "llm_seed": 1,
+      "scenario_sha256": "aaee247f05b87e291643767e94e156d43b6c1abe58f51d69f5913038413b3f0c",
+      "config": {
+        "mode": {
+          "execution": "A",
+          "comm": "F",
+          "structured": false,
+          "verify": false,
+          "guard": false
+        },
+        "first_agent": "B",
+        "role_swap": false,
+        "submission_open_at": 40,
+        "start_gap": 0,
+        "horizon": 80,
+        "commit_delay": null,
+        "message_delay": null,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613
+      },
+      "metadata": {
+        "scenario_id": "dev_s4_01",
+        "mode": "A/F",
+        "budget": 21,
+        "horizon": 80,
+        "commit_delay": 2,
+        "message_delay": 1,
+        "agent_turn_limit": 24,
+        "environment_seed": 2374523613,
+        "first_agent": "B",
+        "role_swap": false,
+        "start_gap": 0,
+        "submission_open_at": {
+          "A": 40,
+          "B": 40
+        },
+        "variant": "A/F",
+        "requires": {
+          "ablation": [
+            "regression"
+          ]
+        },
+        "catalog": {
+          "qa": {
+            "owner": "A",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 7,
+                "duration": 3
+              }
+            }
+          },
+          "regression": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 12,
+                "duration": 3
+              },
+              "short": {
+                "cost": 8,
+                "duration": 2
+              }
+            }
+          },
+          "ablation": {
+            "owner": "B",
+            "options": {
+              "full": {
+                "cost": 3,
+                "duration": 3
+              },
+              "short": {
+                "cost": 1,
+                "duration": 4
+              }
+            }
+          }
+        },
+        "preparation_turn_limit": 12,
+        "execution_turn_limit": 12,
+        "protocol_version": "baseline-phases-1"
+      },
+      "system_sha256": {
+        "A": "8c8abe1299ee9beee761f871020658090300c70932afe47cd4b6f0467e2e903f",
+        "B": "9123c49dd8be695ef394b280c35faf835b63db7afc4fc945672db0c3edad2154"
+      },
+      "tools_sha256": {
+        "preparation": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "message_round": "0f71838508483fb3f1f91bb0e36c8367c154e414ce61b23a9fee6c9245ce6670",
+        "execution_wait": "c58ea5c38d184db1251c14462dc20a4dcd2d4bcdf2a4718126143a4e343965ba",
+        "execution": "e24bf38793360b15f28f5cfb67177e2bb57e980e3e342bfcc6778ffd841fcee2"
+      }
+    }
+  },
+  "scenario_manifest_sha256": "83e484274f8d922f83cdcfa416c9091b000ea3dbe22cdd5e0e52b8c4a6bf58ff"
+}
