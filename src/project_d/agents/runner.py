@@ -82,7 +82,10 @@ class LLMPolicy:
         shown = {
             "plan_version": view["plan_version"],
             "feedback_shown": feedback is not None,
-            "overage": feedback["overage"] if feedback else None,
+            # An incomplete plan is rendered without an overage, so it is not a warning.
+            "overage": feedback["overage"]
+            if feedback and feedback["status"] != "INCOMPLETE"
+            else None,
             "status": feedback["status"] if feedback else None,
             "text_sha256": prompt_sha256(text),
         }

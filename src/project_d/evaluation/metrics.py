@@ -110,6 +110,7 @@ class AgreementMetrics:
     v_warning_status: str | None = None
     off_plan_attempts: int | None = None
     off_plan_accepted: int | None = None
+    agreed_missing_prerequisites: int | None = None
 
 
 def agreement_metrics(
@@ -117,6 +118,7 @@ def agreement_metrics(
     budget: int,
     shown: Iterable[tuple[str, int, dict[str, Any] | None]] = (),
     horizon: int | None = None,
+    requires: dict[str, list[str]] | None = None,
 ) -> AgreementMetrics:
     """Score the agreement from the journal and what each agent's prompt actually contained.
 
@@ -151,7 +153,7 @@ def agreement_metrics(
             and plan is not None
             and plan["plan_version"] == version
             and plan["feedback_shown"]
-            and plan["overage"] > 0
+            and (plan["overage"] or 0) > 0
             for agent, time, plan in turns
         )
 
@@ -187,6 +189,15 @@ def agreement_metrics(
         if e.event_type == "complete" and (horizon is None or e.time <= horizon)
     }
     off_plan = [e for e in log if e.event_type == "submit" and e.detail.get("off_plan")]
+    chosen = {
+        agent: {item["job_id"] for item in proposal["items"]}
+        for agent, proposal in versions[version].items()
+    }
+    missing_prerequisites = sum(
+        any(required not in jobs for required in (requires or {}).get(job_id, ()))
+        for jobs in chosen.values()
+        for job_id in jobs
+    )
     completed = sum(pair in finished for pair in items)
 
     status = None
@@ -212,6 +223,7 @@ def agreement_metrics(
         v_warning_status=status,
         off_plan_attempts=len(off_plan),
         off_plan_accepted=sum(e.result == "accepted" for e in off_plan),
+        agreed_missing_prerequisites=missing_prerequisites,
     )
 
 

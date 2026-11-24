@@ -257,7 +257,13 @@ def summarize_episode(
     }
     shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in episode.turns]
     row |= asdict(
-        agreement_metrics(result.log, result.metadata.budget, shown, result.metadata.horizon)
+        agreement_metrics(
+            result.log,
+            result.metadata.budget,
+            shown,
+            result.metadata.horizon,
+            result.metadata.requires,
+        )
     )
     resolved = spec.run_config(scenario).apply(scenario)
     row["primary_completed"] = {

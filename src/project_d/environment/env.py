@@ -125,6 +125,13 @@ class Environment:
             *(a for a in agent_ids if a != config.first_agent),
         )
         self.submission_open_at = config.open_times(agent_ids)
+        limit = self.scenario.agent_turn_limit
+        preparation = min(12, max(0, limit - min(12, limit)))
+        if len(self.variant.slot_times) > preparation:
+            raise ScenarioError(
+                f"{self.variant.value} needs {len(self.variant.slot_times)} preparation decisions "
+                f"for its slots, the turn limit leaves {preparation}"
+            )
 
         self._jobs = {
             job.job_id: _JobRecord(agent.agent_id, job)
@@ -459,16 +466,17 @@ class Environment:
             return ToolStatus.NOT_OWNER
         if option is None:
             return ToolStatus.UNKNOWN_OPTION
-        if record.status is not JobStatus.NOT_STARTED:
-            return ToolStatus.JOB_ALREADY_ACCEPTED
-        if self._now < self.submission_open_at[agent_id]:
-            return ToolStatus.SUBMISSION_NOT_OPEN
+        # G is checked before the other rules, so an earlier acceptance cannot mask a mismatch.
         if (
             self.variant.guard
             and self._agreed is not None
             and (record.job.job_id, option.option_id) not in self._agreed[agent_id]
         ):
             return ToolStatus.PLAN_MISMATCH
+        if record.status is not JobStatus.NOT_STARTED:
+            return ToolStatus.JOB_ALREADY_ACCEPTED
+        if self._now < self.submission_open_at[agent_id]:
+            return ToolStatus.SUBMISSION_NOT_OPEN
         if any(self._jobs[r].status is not JobStatus.COMPLETED for r in record.job.requires):
             return ToolStatus.PREREQUISITE_NOT_COMPLETED
         if self._now + self.scenario.commit_delay + option.duration > self.scenario.horizon:
@@ -523,8 +531,13 @@ class Environment:
         )
 
     def _plan_detail(self, agent_id: str, job_id: str, option_id: str) -> dict[str, Any]:
-        """Mark submissions against an agreed plan; G=0 records the mismatch without refusing."""
-        if self._agreed is None:
+        """Mark submissions against an agreed plan; G=0 records the mismatch without refusing.
+
+        Only own, existing job/option pairs are compared (system_spec.md, section 7).
+        """
+        record = self._jobs.get(job_id)
+        valid = record is not None and record.owner == agent_id and record.job.option(option_id)
+        if self._agreed is None or not valid:
             return {}
         return {
             "plan_version": self._agreed_version,

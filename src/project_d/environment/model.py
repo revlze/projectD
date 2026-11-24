@@ -74,8 +74,10 @@ class Variant:
             raise ScenarioError("structured proposals are the S protocol and only it")
         if self.structured and self.execution != "A":
             raise ScenarioError("structured protocols use atomic execution")
-        if self.structured and self.rounds not in (0, 1, 2):
-            raise ScenarioError(f"structured protocols have 0-2 rounds, got {self.rounds}")
+        if self.structured and (self.verify, self.guard, self.rounds) not in _STRUCTURED.values():
+            raise ScenarioError(
+                f"no structured protocol with V={self.verify}, G={self.guard}, r={self.rounds}"
+            )
         if not self.structured and self.rounds:
             raise ScenarioError("only structured protocols take a round count")
 

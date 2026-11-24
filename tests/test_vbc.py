@@ -77,13 +77,17 @@ def test_six_structured_variants_parse_to_the_spec_table() -> None:
 
 
 @pytest.mark.parametrize("variant", STRUCTURED)
-@pytest.mark.parametrize(("first_agent", "role_swap"), [("A", False), ("B", True)])
+@pytest.mark.parametrize("first_agent", ["A", "B"])
+@pytest.mark.parametrize("role_swap", [False, True])
 def test_t26_phase_grid_simultaneous_proposals_and_visible_versions(
     variant: str, first_agent: str, role_swap: bool
 ) -> None:
     rounds = Variant.parse(variant).round_times
     probes = {t: SendMessage("B", "early") for t in (0, 5)}
-    a = Watcher({**probes, 6: ProposePlan((A_FULL,), (A_SHORT,)), 33: ProposePlan((A_SHORT,))})
+    sends = {t: SendMessage("B", f"round {t}") for t in rounds}
+    a = Watcher(
+        {**probes, **sends, 6: ProposePlan((A_FULL,), (A_SHORT,)), 33: ProposePlan((A_SHORT,))}
+    )
     b = Watcher({6: ProposePlan((B_STANDARD,))})
     result = run_episode(
         _scenario(),
@@ -91,7 +95,11 @@ def test_t26_phase_grid_simultaneous_proposals_and_visible_versions(
         {"A": a, "B": b},
     )
     # No communication before the first proposal; only the slots get decisions afterwards.
-    early = [c.result.status for c in result.calls_by("A") if isinstance(c.action, SendMessage)]
+    early = [
+        c.result.status
+        for c in result.calls_by("A")
+        if isinstance(c.action, SendMessage) and c.time < 6
+    ]
     assert len(early) == 2 and ToolStatus.OK not in early
     slots = {6, *rounds, 33, 37}
     for watcher in (a, b):
@@ -102,7 +110,8 @@ def test_t26_phase_grid_simultaneous_proposals_and_visible_versions(
         assert watcher.seen[37].plan_view["plan_version"] == 2
     assert [e.time for e in _events(result, "plan_version")] == list(SNAPSHOT_TIMES)
     assert {e.time for e in _events(result, "propose_plan")} <= set(PROPOSE_TIMES)
-    assert all(e.time in rounds for e in _events(result, "send_message") if e.result == "ok")
+    sent = [e.time for e in _events(result, "send_message") if e.result == "ok"]
+    assert sent == list(rounds)
     assert audit_episode(result.metadata, result.log).consistent
 
 
@@ -301,3 +310,141 @@ def test_guard_rejects_off_plan_only_with_g() -> None:
     for variant, expected in (("A/S", "accepted"), ("A/S+G", "plan_mismatch")):
         submit = _events(run(variant), "submit")[0]
         assert (submit.result, submit.detail["off_plan"]) == (expected, True)
+
+
+# --- Regression cases from the independent review of 617ac91.
+
+
+def _agreed(variant, a_steps, budget=13, scenario=None):
+    a = ScriptedPolicy({6: ProposePlan((A_SHORT,)), 37: ConfirmPlan(2), **a_steps})
+    b = ScriptedPolicy({6: ProposePlan((B_STANDARD,)), 37: ConfirmPlan(2)})
+    return run_episode(
+        scenario or _scenario(budget=budget), RunConfig.for_protocol(variant), {"A": a, "B": b}
+    )
+
+
+@pytest.mark.parametrize("variant", ["A/S", "A/S+G"])
+def test_off_plan_counts_only_own_valid_pairs(variant: str) -> None:
+    from project_d.evaluation.metrics import agreement_metrics
+
+    steps = {
+        40: SubmitJob("no_such_job", "full"),
+        41: SubmitJob(*B_STANDARD),
+        42: SubmitJob("job_a", "no_such_option"),
+        43: SubmitJob(*A_FULL),
+    }
+    result = _agreed(variant, steps)
+    marked = [e.time for e in _events(result, "submit") if e.detail.get("off_plan")]
+    assert marked == [43]
+    assert agreement_metrics(result.log, 13).off_plan_attempts == 1
+    assert audit_episode(result.metadata, result.log).consistent
+
+
+def test_guard_mismatch_is_not_masked_by_an_earlier_acceptance() -> None:
+    result = _agreed("A/S+G", {40: SubmitJob(*A_SHORT), 41: SubmitJob(*A_FULL)})
+    assert [e.result for e in _events(result, "submit") if e.agent_id == "A"] == [
+        "accepted",
+        "plan_mismatch",
+    ]
+
+
+def test_audit_rebuilds_off_plan_marks_and_v_rows() -> None:
+    from dataclasses import replace
+
+    flipped = _agreed("A/S", {40: SubmitJob(*A_FULL)})
+    log = [
+        replace(e, detail={**e.detail, "off_plan": False}) if e.detail.get("off_plan") else e
+        for e in flipped.log
+    ]
+    assert any("off-plan" in i for i in audit_episode(flipped.metadata, log).issues)
+
+    vbc = _agreed("A/VBC", {})
+    assert audit_episode(vbc.metadata, vbc.log).consistent
+    without_v = [e for e in vbc.log if e.event_type != "plan_feedback"]
+    without_v = [replace(e, seq=i) for i, e in enumerate(without_v)]
+    assert any("V feedback" in i for i in audit_episode(vbc.metadata, without_v).issues)
+    shifted = [replace(e, time=7) if e.event_type == "plan_version" else e for e in vbc.log]
+    assert not audit_episode(vbc.metadata, shifted).consistent
+
+
+def test_incomplete_plan_is_not_recorded_as_a_warning() -> None:
+    from project_d.agents.runner import LLMPolicy
+
+    agent = _scenario().agents[0]
+    policy = LLMPolicy(agent, "B", Variant.parse("A/VBC"), 40, RecordingClient())
+    view = {
+        "plan_version": 1,
+        "proposals": {"A": {"items": [], "disclosed_alternatives": [], "note": ""}},
+        "plan_feedback": {
+            "plan_version": 1,
+            "budget": 12,
+            "requested_total": 14,
+            "overage": 2,
+            "agent_totals": {"A": 14},
+            "disclosed_savings": [],
+            "unmet_requires": [],
+            "missing_plans": ["B"],
+            "status": "INCOMPLETE",
+        },
+    }
+    text, shown = policy._new_plan(view)
+    assert "INCOMPLETE" in text and "превышение" not in text
+    assert (shown["status"], shown["overage"]) == ("INCOMPLETE", None)
+
+
+def test_agreed_plan_without_its_prerequisite_is_counted() -> None:
+    from dataclasses import replace
+
+    from project_d.environment.model import Job, Option
+    from project_d.evaluation.metrics import agreement_metrics
+
+    base = _scenario(budget=13)
+    agent_a, agent_b = base.agents
+    followup = Job("followup", (Option("run", 1, 2, 1),), requires=("job_a",))
+    scenario = replace(base, agents=(replace(agent_a, jobs=(*agent_a.jobs, followup)), agent_b))
+    a = ScriptedPolicy({6: ProposePlan((("followup", "run"),)), 37: ConfirmPlan(2)})
+    b = ScriptedPolicy({6: ProposePlan((B_STANDARD,)), 37: ConfirmPlan(2)})
+    result = run_episode(scenario, RunConfig.for_protocol("A/S+G"), {"A": a, "B": b})
+    metrics = agreement_metrics(result.log, 13, requires=result.metadata.requires)
+    assert metrics.agreed and metrics.agreed_missing_prerequisites == 1
+
+
+def test_structured_configurations_fail_at_construction() -> None:
+    from project_d.environment.env import Environment
+    from project_d.environment.model import Comm
+
+    with pytest.raises(ValueError):
+        Variant("A", Comm.S, structured=True)
+    with pytest.raises(ValueError, match="preparation decisions"):
+        Environment(_scenario(), RunConfig.for_protocol("A/VBC-r2", agent_turn_limit=16))
+
+
+def test_t29_and_t34_warning_reaches_the_request_with_its_logged_hash() -> None:
+    from project_d.evaluation.metrics import agreement_metrics
+
+    client = PlanningClient()
+    episode = run_llm_episode(make_scenario(), RunConfig.for_protocol("A/VBC"), client)
+    log = episode.result.log
+    shown = [(t.agent_id, t.logical_time, t.shown_plan) for t in episode.turns]
+    metrics = agreement_metrics(log, 12, shown)
+    assert (metrics.agreed_total, metrics.v_warning_status) == (13, "warned_and_confirmed")
+    versions = {
+        e.detail["plan_version"]: e.detail["proposals"]
+        for e in log
+        if e.event_type == "plan_version"
+    }
+    feedback = {e.detail["plan_version"]: e.detail for e in log if e.event_type == "plan_feedback"}
+    for turn in episode.turns:
+        if not turn.shown_plan:
+            continue
+        version = turn.shown_plan["plan_version"]
+        view = {
+            "plan_version": version,
+            "proposals": versions[version],
+            "plan_feedback": feedback[version],
+        }
+        peer = "B" if turn.agent_id == "A" else "A"
+        text = render_plan(view, turn.agent_id, peer)
+        assert text in turn.request["messages"][-1]["content"]
+        assert prompt_sha256(text) == turn.shown_plan["text_sha256"]
+        assert "OVER_BUDGET" in text

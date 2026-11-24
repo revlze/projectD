@@ -12,7 +12,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from project_d.environment.journal import EpisodeMetadata, LogEntry
-from project_d.environment.model import CONFIRM_TIME, PROPOSE_TIMES, SNAPSHOT_TIMES, Variant
+from project_d.environment.model import (
+    CONFIRM_TIME,
+    FEEDBACK_TIMES,
+    PROPOSE_TIMES,
+    SNAPSHOT_TIMES,
+    Variant,
+)
 
 
 @dataclass(frozen=True)
@@ -68,6 +74,8 @@ class _PlanAudit:
         self.confirmations: dict[str, int] = {}
         self.agreement_rows = 0
         self.agreement: str | None = None
+        self.agreed_items: dict[str, set[tuple[str, str]]] | None = None
+        self.feedback_versions: list[int] = []
 
     def propose(self, entry: LogEntry, where: str) -> None:
         if entry.time not in PROPOSE_TIMES:
@@ -83,12 +91,61 @@ class _PlanAudit:
 
     def snapshot(self, entry: LogEntry, where: str) -> None:
         version = len(self.versions) + 1
-        if entry.time not in SNAPSHOT_TIMES or entry.detail.get("plan_version") != version:
+        expected_time = SNAPSHOT_TIMES[version - 1] if version <= len(SNAPSHOT_TIMES) else None
+        if entry.time != expected_time or entry.detail.get("plan_version") != version:
             self.issues.append(f"{where}: unexpected plan version or time")
         rebuilt = {agent: dict(proposal) for agent, proposal in self.live.items()}
         if entry.detail.get("proposals") != rebuilt:
             self.issues.append(f"{where}: snapshot differs from logged proposals")
         self.versions[version] = rebuilt
+
+    def feedback(self, entry: LogEntry, where: str) -> None:
+        """Each V row belongs to the latest version, at its own time, with rebuilt arithmetic."""
+        version = entry.detail.get("plan_version")
+        if (
+            not self.variant.verify
+            or version != max(self.versions, default=None)
+            or version in self.feedback_versions
+            or entry.time != FEEDBACK_TIMES[version - 1]
+        ):
+            self.issues.append(f"{where}: unexpected V feedback")
+            return
+        self.feedback_versions.append(version)
+        proposals = self.versions[version]
+        requested = sum(item["cost"] for p in proposals.values() for item in p["items"])
+        missing = sorted(self.agents - set(proposals))
+        if missing:
+            status = "INCOMPLETE"
+        else:
+            status = "OVER_BUDGET" if requested > self.metadata.budget else "WITHIN_BUDGET"
+        rebuilt = {
+            "requested_total": requested,
+            "overage": max(requested - self.metadata.budget, 0),
+            "status": status,
+        }
+        if {key: entry.detail.get(key) for key in rebuilt} != rebuilt or sorted(
+            entry.detail.get("missing_plans", ())
+        ) != missing:
+            self.issues.append(f"{where}: V feedback differs from the rebuilt version")
+
+    def check_off_plan(self, entry: LogEntry, where: str) -> None:
+        """Rebuild the off-plan mark of every own, valid submission after an agreement."""
+        if not self.variant.structured:
+            return
+        expected: dict[str, Any] = {}
+        agent_id = entry.agent_id or ""
+        job = self.metadata.catalog.get(entry.job_id or "")
+        valid = job is not None and job["owner"] == agent_id and entry.option_id in job["options"]
+        if self.agreed_items is not None and valid:
+            expected = {
+                "plan_version": max(self.versions),
+                "off_plan": (entry.job_id, entry.option_id) not in self.agreed_items[agent_id],
+            }
+        logged = {
+            key: entry.detail[key] for key in ("plan_version", "off_plan") if key in entry.detail
+        }
+        if logged != expected:
+            self.issues.append(f"{where}: off-plan mark differs from the agreed plan")
 
     def confirm(self, entry: LogEntry, where: str) -> None:
         version = entry.detail.get("plan_version")
@@ -119,6 +176,11 @@ class _PlanAudit:
         self.agreement = entry.result
         version = self.agreed_version()
         agreed = version is not None
+        if agreed:
+            self.agreed_items = {
+                agent: {(i["job_id"], i["option_id"]) for i in proposal["items"]}
+                for agent, proposal in self.versions[version].items()
+            }
         expected = {
             "plan_version": version,
             "confirmations": self.confirmations,
@@ -149,6 +211,10 @@ class _PlanAudit:
             self.issues.append(f"expected {len(SNAPSHOT_TIMES)} plan versions")
         if self.agreement_rows != 1:
             self.issues.append(f"expected one agreement row, found {self.agreement_rows}")
+        if self.variant.verify and self.feedback_versions != [1, 2]:
+            self.issues.append(
+                f"expected V feedback for versions 1 and 2, found {self.feedback_versions}"
+            )
 
 
 def audit_episode(
@@ -238,6 +304,8 @@ def audit_episode(
             issues.append(f"{where}: time moved backwards")
         last_time = max(last_time, entry.time)
 
+        if entry.event_type == "submit":
+            plans.check_off_plan(entry, where)
         if entry.event_type == "submit" and entry.result == "accepted":
             if entry.job_id in accepted_jobs:
                 issues.append(f"{where}: job {entry.job_id} accepted twice")
@@ -311,6 +379,8 @@ def audit_episode(
             plans.propose(entry, where)
         elif entry.event_type == "plan_version":
             plans.snapshot(entry, where)
+        elif entry.event_type == "plan_feedback":
+            plans.feedback(entry, where)
         elif entry.event_type == "confirm_plan" and entry.result == "ok":
             plans.confirm(entry, where)
         elif entry.event_type == "agreement":
