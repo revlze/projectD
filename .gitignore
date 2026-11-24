@@ -18,9 +18,7 @@ dist/
 .coverage
 htmlcov/
 
-# Generated data and run outputs (keep directory placeholders)
-data/generated/*
-!data/generated/.gitkeep
+# Run outputs (keep the directory placeholder)
 outputs/*
 !outputs/.gitkeep
 

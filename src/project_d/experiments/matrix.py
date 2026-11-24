@@ -25,12 +25,14 @@ from project_d.agents.llm_client import (
     LLMConfig,
     OpenAICompatibleClient,
 )
+from project_d.agents.prompts import PROMPT_VERSION, build_protocol_prompt, prompt_sha256
 from project_d.agents.runner import LLMEpisode, run_llm_episode, write_episode
+from project_d.agents.tools import tool_schemas
 from project_d.environment.actions import SubmitJob
+from project_d.environment.env import Environment
 from project_d.environment.model import (
     AgentSpec,
     Job,
-    Mode,
     Option,
     RunConfig,
     Scenario,
@@ -39,6 +41,7 @@ from project_d.environment.model import (
 from project_d.evaluation.audit import audit_episode
 from project_d.evaluation.metrics import agreement_metrics, episode_metrics
 from project_d.experiments.generator import validate_dataset
+from project_d.experiments.storage import RunStore, file_sha256, fingerprint
 from project_d.simulation.scheduler import ScriptedPolicy, run_episode
 
 DATA_ROOT = Path("data/scenarios")
@@ -50,7 +53,7 @@ CONTEXT_SAFETY = 0.9
 # Every profile runs both processing orders crossed with both role assignments.
 REPEATS = (("A", False), ("B", False), ("A", True), ("B", True))
 
-E1_VARIANTS = (
+BASELINE_VARIANTS = (
     "U/N",
     "U/F",
     "A/N",
@@ -61,18 +64,14 @@ E1_VARIANTS = (
     "A/R3",
     "U/R3P",
     "A/R3P",
-    "A/R3P+S",
-    "A/R3P+S+V",
-    "A/R3P+S+G",
-    "A/VBC",
 )
-E2_VARIANTS = ("U/N", "U/F", "A/N", "A/F", "U/R3", "A/R3", "U/R3P", "A/R3P", "A/VBC")
-# E3 reuses the E2 episodes of A/R3, U/R3, A/R3P and A/VBC on the same profiles.
-E3_VARIANTS = ("U/R1", "A/R1", "A/R3P+S", "A/R3P+S+V", "A/R3P+S+G")
+E3_VARIANTS = ("A/S", "A/S+V", "A/S+G", "A/VBC-r0", "A/VBC-r2")
+E1_VARIANTS = (*BASELINE_VARIANTS, *E3_VARIANTS[:3], "A/VBC", *E3_VARIANTS[3:])
+E2_VARIANTS = (*BASELINE_VARIANTS, "A/VBC")
 E4_H1_VARIANTS = ("U/N", "U/R3P")
 E4_H1_PROFILES = ("test/test_s1_01.json", "test/test_s1_02.json")
 E4_DELAY_VARIANTS = ("A/R3P", "A/VBC")
-E4_DELAYS = (1, 4, 8)
+E4_DELAYS = (4, 8)
 E4_COMMIT_DELAYS = (0, 1, 3)
 E4_START_GAPS = (0, 2, 4)
 SERIES = ("E1", "E2", "E3", "E4-H1", "E4-delay")
@@ -173,7 +172,7 @@ def build_matrix(series: str, manifest: dict[str, Any]) -> list[EpisodeSpec]:
 
 
 def context_problem(episode: LLMEpisode, context_length: int | None) -> str | None:
-    """Detect silent truncation: histories only grow, so a falling prompt size means lost turns."""
+    """Return usage warnings, not proof of truncation or a reason to discard an episode."""
     by_agent: dict[str, list[int]] = {}
     for turn in episode.turns:
         by_agent.setdefault(turn.agent_id, []).append(turn.usage.get("prompt_tokens", 0))
@@ -183,7 +182,7 @@ def context_problem(episode: LLMEpisode, context_length: int | None) -> str | No
         for before, after in itertools.pairwise(tokens)
     )
     if drops:
-        return f"context_truncated: prompt size fell {drops} times"
+        return f"context_usage_drop: prompt size fell {drops} times; phase tool sets can shrink"
     largest = max((max(tokens) for tokens in by_agent.values()), default=0)
     if context_length is not None and largest >= CONTEXT_SAFETY * context_length:
         return f"context_limit: prompt reached {largest} of {context_length} tokens"
@@ -207,7 +206,8 @@ def summarize_episode(
         "first_agent": first_agent,
         "role_swap": role_swap,
         "start_gap": spec.start_gap,
-        "failure": episode.failure or context_problem(episode, context_length),
+        "failure": episode.failure,
+        "context_warning": context_problem(episode, context_length),
         "max_prompt_tokens": max(
             (turn.usage.get("prompt_tokens", 0) for turn in episode.turns), default=0
         ),
@@ -223,6 +223,8 @@ def summarize_episode(
     result = episode.result
     metrics = episode_metrics(scenario, result.metadata, result.log)
     audit = metrics.audit
+    if audit.issues and row["failure"] is None:
+        row["failure"] = "environment_audit_failed"
     row |= {
         "commit_delay": result.metadata.commit_delay,
         "message_delay": result.metadata.message_delay,
@@ -239,12 +241,24 @@ def summarize_episode(
         "messages": metrics.message_count,
         "tool_calls": len(result.calls),
         "rounds_missed": sum(e.event_type == "round_missed" for e in result.log),
+        "rounds_skipped": sum(e.event_type == "round_skipped" for e in result.log),
+        "early_finish_attempts": sum(
+            e.event_type == "finish" and e.result == "finish_not_open" for e in result.log
+        ),
         "agreement": audit.agreement,
         "plan_mismatches": audit.plan_mismatches,
         "audit_issues": len(audit.issues),
     }
     shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in episode.turns]
     row |= asdict(agreement_metrics(result.log, result.metadata.budget, shown))
+    resolved = spec.run_config(scenario).apply(scenario)
+    row["primary_completed"] = {
+        agent.agent_id: {
+            "job_id": agent.jobs[0].job_id,
+            "completed": agent.jobs[0].job_id in audit.completed_jobs,
+        }
+        for agent in resolved.agents
+    }
     return row
 
 
@@ -290,7 +304,12 @@ def _model_card(llm: LLMConfig) -> dict[str, Any] | None:
         ),
         None,
     )
-    return {"weights": weights and Path(weights).name, "parameters": card.get("parameters")}
+    return {
+        "weights": weights and Path(weights).name,
+        "parameters": card.get("parameters"),
+        "template": card.get("template"),
+        "details": card.get("details"),
+    }
 
 
 def loaded_context_length(llm: LLMConfig) -> int | None:
@@ -333,6 +352,7 @@ def run_manifest(llm: LLMConfig, base_seed: int, context_length: int) -> dict[st
         "ollama_env": {name: os.environ.get(name) for name in SERVER_ENV},
         "git_commit": _command_output("git", "rev-parse", "HEAD"),
         "git_dirty": bool(_command_output("git", "status", "--porcelain")),
+        "prompt_version": PROMPT_VERSION,
     }
 
 
@@ -343,27 +363,77 @@ def run_specs(
     client_for_seed: Callable[[int], ChatClient],
     base_seed: int = 0,
     context_length: int | None = None,
+    *,
+    run_identity: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    """Run episodes, skipping finished ones. Failed episodes are retried on the next run."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+    """Resume only identical, complete episodes; preserve failed attempts before retrying."""
+    if not specs or len({spec.name for spec in specs}) != len(specs):
+        raise ValueError("Episode selection must be nonempty and have unique keys")
+    if any(spec.variant not in BASELINE_VARIANTS for spec in specs):
+        raise ValueError("Structured protocols require the separate VBC implementation stage")
+    manifest = load_manifest(data_root)
+    verify_profiles(data_root, manifest, (spec.profile for spec in specs))
+    source_root = Path(__file__).resolve().parents[1]
+    source_hashes = {
+        path.relative_to(source_root).as_posix(): hashlib.sha256(
+            path.read_bytes().replace(b"\r\n", b"\n")
+        ).hexdigest()
+        for path in sorted(source_root.rglob("*.py"))
+    }
+    identities = {}
+    for spec in specs:
+        scenario = load_scenario(data_root / spec.profile)
+        config = spec.run_config(scenario)
+        resolved = config.apply(scenario)
+        ids = [agent.agent_id for agent in resolved.agents]
+        opens = config.open_times(ids)
+        identities[spec.name] = {
+            "spec": asdict(spec),
+            "llm_seed": base_seed + spec.repeat,
+            "scenario_sha256": file_sha256(data_root / spec.profile),
+            "config": asdict(config),
+            "metadata": asdict(Environment(scenario, config).metadata),
+            "system_sha256": {
+                agent.agent_id: prompt_sha256(
+                    build_protocol_prompt(
+                        agent,
+                        next(peer for peer in ids if peer != agent.agent_id),
+                        config.variant,
+                        opens[agent.agent_id],
+                    )
+                )
+                for agent in resolved.agents
+            },
+            "tools_sha256": {
+                phase: fingerprint(tool_schemas(config.variant, phase))
+                for phase in ("preparation", "message_round", "execution_wait", "execution")
+            },
+        }
+    identity = {
+        "schema_version": 1,
+        "runtime": run_identity,
+        "source_sha256": source_hashes,
+        "prompt_version": PROMPT_VERSION,
+        "context_length": context_length,
+        "episodes": identities,
+        "scenario_manifest_sha256": file_sha256(data_root / "manifest.json"),
+    }
     rows = []
-    for index, spec in enumerate(specs, start=1):
-        summary_path = output_dir / f"{spec.name}.summary.json"
-        if summary_path.exists():
-            saved = json.loads(summary_path.read_text(encoding="utf-8"))
-            if saved["failure"] is None:
+    with RunStore(output_dir, identity) as store:
+        for index, spec in enumerate(specs, start=1):
+            saved = store.load(spec.name)
+            if saved is not None:
                 rows.append(saved)
                 continue
-        scenario = load_scenario(data_root / spec.profile)
-        # The same repeat gets the same seed in every method, which keeps comparisons paired.
-        client = client_for_seed(base_seed + spec.repeat)
-        episode = run_llm_episode(scenario, spec.run_config(scenario), client)
-        write_episode(output_dir, spec.name, episode)
-        row = summarize_episode(spec, scenario, episode, context_length)
-        summary_path.write_text(json.dumps(row, ensure_ascii=False, indent=2), encoding="utf-8")
-        rows.append(row)
-        print(f"[{index}/{len(specs)}] {spec.name}: {row.get('U_safe', 'failed')}", flush=True)
-    _write_table(output_dir / "summary.csv", rows)
+            scenario = load_scenario(data_root / spec.profile)
+            client = client_for_seed(base_seed + spec.repeat)
+            episode = run_llm_episode(scenario, spec.run_config(scenario), client)
+            write_episode(output_dir, spec.name, episode)
+            row = summarize_episode(spec, scenario, episode, context_length)
+            store.complete(spec.name, row)
+            rows.append(row)
+            print(f"[{index}/{len(specs)}] {spec.name}: {row.get('U_safe', 'failed')}", flush=True)
+        _write_table(output_dir / "summary.csv", rows)
     return rows
 
 
@@ -371,16 +441,16 @@ def run_e0(output_dir: Path) -> list[dict[str, Any]]:
     """The 108 scripted mechanism runs. No LLM is involved."""
     rows = []
     for (budget, cost_a, cost_b), delay, offset, mode, first in itertools.product(
-        ((12, 5, 6), (12, 7, 6), (12, 7, 5)), (0, 1, 3), (0, 1, 3), (Mode.B0, Mode.B2), ("A", "B")
+        ((12, 5, 6), (12, 7, 6), (12, 7, 5)), (0, 1, 3), (0, 1, 3), ("U/N", "A/N"), ("A", "B")
     ):
         scenario = Scenario(
             scenario_id="e0",
             family="E0",
             budget=budget,
-            horizon=30,
+            horizon=80,
             commit_delay=delay,
             message_delay=1,
-            agent_turn_limit=16,
+            agent_turn_limit=24,
             seed=0,
             agents=(
                 AgentSpec("A", "e0", (Job("job_a", (Option("full", cost_a, 2, 1),)),)),
@@ -388,10 +458,10 @@ def run_e0(output_dir: Path) -> list[dict[str, Any]]:
             ),
         )
         policies = {
-            "A": ScriptedPolicy({0: SubmitJob("job_a", "full")}),
-            "B": ScriptedPolicy({offset: SubmitJob("job_b", "full")}),
+            "A": ScriptedPolicy({40: SubmitJob("job_a", "full")}),
+            "B": ScriptedPolicy({40 + offset: SubmitJob("job_b", "full")}),
         }
-        config = RunConfig(mode=mode, first_agent=first, submission_open_at=0)
+        config = RunConfig.for_protocol(mode, first_agent=first)
         result = run_episode(scenario, config, policies)
         report = audit_episode(result.metadata, result.log)
         rows.append(
@@ -401,7 +471,7 @@ def run_e0(output_dir: Path) -> list[dict[str, Any]]:
                 "cost_b": cost_b,
                 "commit_delay": delay,
                 "offset": offset,
-                "mode": mode.value,
+                "mode": mode,
                 "first_agent": first,
                 "violated": report.violated,
                 "max_overrun": report.max_overrun,
@@ -431,6 +501,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--profiles", help="Comma-separated profile stems (for debugging on dev)")
     parser.add_argument("--variants", help="Comma-separated variants (for debugging on dev)")
+    parser.add_argument(
+        "--baseline-only", action="store_true", help="Select the ten baseline methods on dev"
+    )
     parser.add_argument("--repeats", type=int, choices=range(1, 5), default=4)
     parser.add_argument("--dry-run", action="store_true", help="Print the planned episode count")
     parser.add_argument(
@@ -450,17 +523,37 @@ def main(argv: list[str] | None = None) -> int:
     specs = build_matrix(args.series, manifest)
     if args.profiles:
         wanted = set(args.profiles.split(","))
+        if not wanted <= {Path(spec.profile).stem for spec in specs}:
+            print("Unknown profile selection for this series.", file=sys.stderr)
+            return 2
         specs = [s for s in specs if Path(s.profile).stem in wanted]
     if args.variants:
         wanted = set(args.variants.split(","))
+        if not wanted <= set(E1_VARIANTS):
+            print("Unknown variant selection.", file=sys.stderr)
+            return 2
         specs = [s for s in specs if s.variant in wanted]
+    if args.baseline_only:
+        specs = [spec for spec in specs if spec.variant in BASELINE_VARIANTS]
     specs = [s for s in specs if s.repeat < args.repeats]
     if args.dry_run:
         print(json.dumps({"series": args.series, "episodes": len(specs)}))
         return 0
     uses_test = any(spec.split == "test" for spec in specs)
-    if uses_test and (not args.allow_test or args.profiles or args.variants or args.repeats != 4):
+    if uses_test and (
+        not args.allow_test
+        or args.profiles
+        or args.variants
+        or args.baseline_only
+        or args.repeats != 4
+    ):
         print("The test split runs only as a full series with --allow-test.", file=sys.stderr)
+        return 2
+    if not specs or any(spec.variant not in BASELINE_VARIANTS for spec in specs):
+        print(
+            "No runnable baseline selection; VBC requires its separate implementation stage.",
+            file=sys.stderr,
+        )
         return 2
     verify_profiles(args.data_root, manifest, (spec.profile for spec in specs))
 
@@ -473,11 +566,15 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 2
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "run_manifest.json").write_text(
-        json.dumps(run_manifest(llm, args.llm_seed, actual_context), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    runtime = run_manifest(llm, args.llm_seed, actual_context)
+    card = runtime["model_card"]
+    if (
+        not card
+        or not str(card.get("weights", "")).startswith("sha256-")
+        or not card.get("template")
+    ):
+        print("Cannot freeze the model weights and chat template from the server.", file=sys.stderr)
+        return 2
     rows = run_specs(
         specs,
         args.data_root,
@@ -485,6 +582,7 @@ def main(argv: list[str] | None = None) -> int:
         lambda seed: OpenAICompatibleClient(replace(llm, seed=seed)),
         args.llm_seed,
         actual_context,
+        run_identity=runtime,
     )
     failed = sum(row["failure"] is not None for row in rows)
     issues = sum(row.get("audit_issues", 0) for row in rows)

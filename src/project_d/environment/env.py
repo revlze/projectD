@@ -1,7 +1,7 @@
 """Shared-budget environment: what each action does to the state.
 
-The scheduler decides when actions run. B0/B1 check the balance at submission and charge later
-without re-checking; B2/B3 check and reserve in one indivisible operation.
+The scheduler decides when actions run. U checks at submission and charges later;
+A checks and reserves in one indivisible operation.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ from project_d.environment.actions import (
     ProposePlan,
     ReadMessages,
     SendMessage,
+    SkipRound,
     SubmitJob,
     ToolResult,
     ToolStatus,
@@ -34,7 +35,6 @@ from project_d.environment.model import (
     Comm,
     Job,
     JobStatus,
-    Mode,
     Option,
     RunConfig,
     Scenario,
@@ -78,7 +78,7 @@ class _Message:
 
 def _well_formed(action: Any) -> bool:
     match action:
-        case ListJobs() | GetBalance() | GetStatus() | ReadMessages() | Finish():
+        case ListJobs() | GetBalance() | GetStatus() | ReadMessages() | Finish() | SkipRound():
             return True
         case SubmitJob():
             return (
@@ -116,7 +116,6 @@ class Environment:
         self.config = config
         self.mode = config.mode
         self.variant = config.variant
-        self._legacy = isinstance(config.mode, Mode)
 
         agent_ids = [agent.agent_id for agent in self.scenario.agents]
         if config.first_agent not in agent_ids:
@@ -147,6 +146,7 @@ class Environment:
         self._finished: set[str] = set()
         self._last_request: dict[str, dict[str, str]] = {}
         self._round_senders: dict[int, set[str]] = {t: set() for t in self.variant.round_times}
+        self._round_skippers: dict[int, set[str]] = {t: set() for t in self.variant.round_times}
         self._proposals: dict[str, dict[str, Any]] = {}
         self._versions: dict[int, dict[str, dict[str, Any]]] = {}
         self._feedback: dict[int, dict[str, Any]] = {}
@@ -203,6 +203,9 @@ class Environment:
             start_gap=self.config.start_gap,
             submission_open_at=dict(self.submission_open_at),
             variant=self.variant.value,
+            preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
+            execution_turn_limit=min(12, self.scenario.agent_turn_limit),
+            protocol_version="baseline-phases-1",
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -226,6 +229,23 @@ class Environment:
     def is_ready(self, agent_id: str) -> bool:
         return agent_id not in self._finished and agent_id not in self._waiting
 
+    def record_decision(self, agent_id: str, phase: str, used: int, limit: int) -> None:
+        self._record(
+            "decision",
+            "issued",
+            agent_id=agent_id,
+            detail={"phase": phase, "phase_turn": used + 1, "phase_limit": limit},
+        )
+
+    def suspend_until(self, agent_id: str, target: int, reason: str) -> None:
+        """Advance scheduling without manufacturing a policy action or spending a decision."""
+        if agent_id not in self._finished and target > self._now:
+            self._waiting[agent_id] = target
+            self._record("auto_wait", reason, agent_id=agent_id, detail={"until": target})
+
+    def finish_episode(self, turns: dict[str, dict[str, int]]) -> None:
+        self._record("episode_end", "complete", detail={"turns": turns})
+
     def unread_count(self, agent_id: str) -> int:
         surfaced = self._surfaced[agent_id]
         return sum(m.message_id not in surfaced for m in self._inboxes[agent_id])
@@ -244,7 +264,11 @@ class Environment:
                 if target <= tick:
                     del self._waiting[agent_id]
                     self._record("wake", "target_reached", agent_id=agent_id)
-                elif tick in self.variant.wake_times:
+                elif tick in (
+                    *self.variant.wake_times,
+                    self.config.submission_open_at,
+                    self.submission_open_at[agent_id],
+                ):
                     del self._waiting[agent_id]
                     self._record("wake", "phase", agent_id=agent_id)
 
@@ -257,11 +281,25 @@ class Environment:
             return self._refuse(
                 agent_id, "invalid_action", ToolStatus.INVALID_ACTION, {"action": repr(action)}
             )
+        if isinstance(action, Finish) and self._now < self.submission_open_at[agent_id]:
+            return self._refuse(agent_id, "finish", ToolStatus.FINISH_NOT_OPEN)
+        if isinstance(action, SubmitJob) and self._now < self.submission_open_at[agent_id]:
+            return self._submit(agent_id, action)
+        if (
+            not self.variant.structured
+            and self.phase() == "message_round"
+            and not isinstance(action, SendMessage | SkipRound)
+        ):
+            return self._refuse(agent_id, "tool_call", ToolStatus.WRONG_PHASE)
         match action:
             case ListJobs():
                 return self._list_jobs(agent_id)
             case GetBalance():
-                return self._respond(agent_id, "get_balance", {"available": self.available})
+                return self._respond(
+                    agent_id,
+                    "get_balance",
+                    {"budget": self.scenario.budget, "available": self.available},
+                )
             case SubmitJob():
                 return self._submit(agent_id, action)
             case GetStatus():
@@ -280,10 +318,29 @@ class Environment:
                 self._finished.add(agent_id)
                 self._waiting.pop(agent_id, None)
                 return self._respond(agent_id, "finish")
+            case SkipRound():
+                if self._now not in self._round_skippers:
+                    return self._refuse(agent_id, "skip_round", ToolStatus.WRONG_PHASE)
+                if agent_id in self._round_senders[self._now] | self._round_skippers[self._now]:
+                    return self._refuse(agent_id, "skip_round", ToolStatus.WRONG_PHASE)
+                self._round_skippers[self._now].add(agent_id)
+                return self._respond(agent_id, "round_skipped")
         raise AssertionError(f"unhandled action: {action!r}")  # pragma: no cover
 
     def own_jobs(self, agent_id: str) -> list[dict[str, Any]]:
-        """The agent's catalog and job statuses, without hidden values."""
+        """Automatic observations expose only own identifiers and actual states."""
+        return [
+            {
+                "job_id": record.job.job_id,
+                "status": record.status.value,
+                "option_id": record.option_id,
+            }
+            for record in self._jobs.values()
+            if record.owner == agent_id
+        ]
+
+    def _catalog(self, agent_id: str) -> list[dict[str, Any]]:
+        """Only list_jobs exposes own variants, costs, durations and dependencies."""
         return [
             {
                 "job_id": record.job.job_id,
@@ -307,9 +364,15 @@ class Environment:
             return "propose"
         if self.variant.structured and now == CONFIRM_TIME:
             return "confirm"
+        if not self.variant.structured:
+            if now >= self.config.submission_open_at:
+                return "execution"
+            if self.variant.round_times and now >= self.variant.round_times[0]:
+                return "negotiation_wait"
+            return "preparation"
         return None
 
-    def take_inbox(self, agent_id: str) -> tuple[dict[str, Any], ...]:
+    def take_inbox(self, agent_id: str, *, mark_read: bool = True) -> tuple[dict[str, Any], ...]:
         """Show newly delivered messages in round protocols. read_messages() still returns them."""
         if not self.variant.round_times:
             return ()
@@ -317,13 +380,14 @@ class Environment:
         messages = [m for m in self._inboxes[agent_id] if m.message_id not in surfaced]
         if not messages:
             return ()
-        surfaced.update(m.message_id for m in messages)
-        self._record(
-            "message_read",
-            ToolStatus.OK.value,
-            agent_id=agent_id,
-            detail={"message_ids": [m.message_id for m in messages]},
-        )
+        if mark_read:
+            surfaced.update(m.message_id for m in messages)
+            self._record(
+                "message_read",
+                ToolStatus.OK.value,
+                agent_id=agent_id,
+                detail={"message_ids": [m.message_id for m in messages]},
+            )
         return tuple({"from": m.sender, "text": m.text, "sent_at": m.sent_at} for m in messages)
 
     def plan_view(self) -> dict[str, Any] | None:
@@ -337,7 +401,7 @@ class Environment:
         return deepcopy(view)
 
     def _list_jobs(self, agent_id: str) -> ToolResult:
-        return self._respond(agent_id, "list_jobs", {"jobs": self.own_jobs(agent_id)})
+        return self._respond(agent_id, "list_jobs", {"jobs": self._catalog(agent_id)})
 
     def _get_status(self, agent_id: str) -> ToolResult:
         jobs = {
@@ -446,7 +510,7 @@ class Environment:
                 "option_id": option.option_id,
                 "cost": option.cost,
                 "commit_at": commit_at,
-                **({} if self._legacy else {"completes_at": commit_at + option.duration}),
+                "completes_at": commit_at + option.duration,
             },
         )
 
@@ -495,7 +559,7 @@ class Environment:
         round_number = None
         if self.variant.round_times:
             senders = self._round_senders.get(self._now)
-            if senders is None or agent_id in senders:
+            if senders is None or agent_id in senders | self._round_skippers[self._now]:
                 return self._refuse(agent_id, "send_message", ToolStatus.MESSAGING_ROUND_CLOSED)
             senders.add(agent_id)
             round_number = self.variant.round_times.index(self._now) + 1
@@ -505,7 +569,7 @@ class Environment:
         self._next_message += 1
         self._queue.push(deliver_at, EventKind.DELIVER, message)
         # A global id would reveal whether the other agent has already sent something.
-        visible_id = message.message_id if self._legacy else self._sent_counts[agent_id]
+        visible_id = self._sent_counts[agent_id]
         self._sent_counts[agent_id] += 1
         data = {"message_id": visible_id, "deliver_at": deliver_at}
         self._record(
@@ -525,6 +589,8 @@ class Environment:
     def _read(self, agent_id: str) -> ToolResult:
         if not self.mode.messaging:
             return self._refuse(agent_id, "read_messages", ToolStatus.MESSAGING_DISABLED)
+        if not self.variant.structured and self.variant.comm is not Comm.F:
+            return self._refuse(agent_id, "read_messages", ToolStatus.WRONG_PHASE)
         messages = [
             {"from": m.sender, "text": m.text, "sent_at": m.sent_at}
             for m in self._inboxes[agent_id]
@@ -536,7 +602,7 @@ class Environment:
             "read_messages",
             ToolStatus.OK.value,
             agent_id=agent_id,
-            detail=None if self._legacy else {"message_ids": message_ids},
+            detail={"message_ids": message_ids},
         )
         return self._result(agent_id, ToolStatus.OK, {"messages": messages})
 
@@ -700,7 +766,9 @@ class Environment:
                 self._deliver(event.payload)
             case EventKind.ROUND_CLOSE:
                 for agent_id in self.processing_order:
-                    if agent_id not in self._round_senders[event.payload]:
+                    if agent_id not in (
+                        self._round_senders[event.payload] | self._round_skippers[event.payload]
+                    ):
                         self._record(
                             "round_missed",
                             ToolStatus.OK.value,
@@ -754,7 +822,11 @@ class Environment:
             detail={"message_id": message.message_id, "from": message.sender},
         )
         # Round protocols surface messages at the next slot, so delivery does not spend a turn.
-        if self.variant.comm is Comm.F and self._waiting.pop(message.recipient, None) is not None:
+        if (
+            self.variant.comm is Comm.F
+            and self._now < self.config.submission_open_at
+            and self._waiting.pop(message.recipient, None) is not None
+        ):
             self._record("wake", "message", agent_id=message.recipient)
 
     def _new_request_id(self) -> str:

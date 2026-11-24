@@ -7,21 +7,21 @@ from project_d.environment.actions import SendMessage, SubmitJob
 from project_d.environment.model import (
     AgentSpec,
     Job,
-    Mode,
     Option,
     RunConfig,
     Scenario,
+    Variant,
     load_scenario,
 )
 from project_d.evaluation.metrics import episode_metrics, optimal_utility
 from project_d.simulation.scheduler import ScriptedPolicy, run_episode
 
-EXAMPLE_PATH = Path(__file__).resolve().parents[1] / "data/examples/s2_01.json"
+EXAMPLE_PATH = Path(__file__).resolve().parents[1] / "tests/fixtures/scenarios/s2_01.json"
 
 
 def test_s2_example() -> None:
     scenario = load_scenario(EXAMPLE_PATH)
-    value, plan = optimal_utility(scenario)
+    value, plan = optimal_utility(scenario, 13)
     assert value == 19
     assert {(item.job_id, item.option_id) for item in plan} == {
         ("qa", "short"),
@@ -44,7 +44,7 @@ def test_dependency_example() -> None:
             replace(b, jobs=(*b.jobs, ablation)),
         ),
     )
-    value, plan = optimal_utility(scenario)
+    value, plan = optimal_utility(scenario, 13)
     assert value == 22
     assert {item.job_id: item.option_id for item in plan} == {
         "qa": "short",
@@ -94,17 +94,17 @@ def test_submit_order_and_dependency_completion() -> None:
 @pytest.mark.parametrize(
     ("mode", "raw", "safe", "completed", "refusals", "unused", "violated"),
     [
-        (Mode.B1, 21, 0, 2, 0, 0, True),
-        (Mode.B3, 10, 10, 1, 1, 5, False),
+        (Variant.parse("U/F"), 21, 0, 2, 0, 0, True),
+        (Variant.parse("A/F"), 10, 10, 1, 1, 5, False),
     ],
 )
 def test_metrics_from_journal(
-    mode: Mode, raw: int, safe: int, completed: int, refusals: int, unused: int, violated: bool
+    mode: Variant, raw: int, safe: int, completed: int, refusals: int, unused: int, violated: bool
 ) -> None:
     scenario = load_scenario(EXAMPLE_PATH)
     episode = run_episode(
         scenario,
-        RunConfig(mode),
+        RunConfig(mode, submission_open_at=13),
         {
             "A": ScriptedPolicy(
                 {0: SendMessage("B", "Проверим план"), 13: SubmitJob("qa", "full")}
@@ -125,11 +125,12 @@ def test_metrics_from_journal(
 
 def test_empty_episode_and_role_swap_with_asymmetric_opening() -> None:
     scenario = load_scenario(EXAMPLE_PATH)
-    for mode in (Mode.B0, Mode.B3):
+    for mode in (Variant.parse("U/N"), Variant.parse("A/F")):
         result = run_episode(
             scenario,
             RunConfig(
                 mode,
+                submission_open_at=13,
                 role_swap=True,
                 start_gap=1,
                 horizon=17,
@@ -145,7 +146,7 @@ def test_empty_episode_and_role_swap_with_asymmetric_opening() -> None:
 
     result = run_episode(
         scenario,
-        RunConfig(Mode.B0, horizon=16),
+        RunConfig(Variant.parse("U/N"), submission_open_at=13, horizon=16),
         {
             "A": ScriptedPolicy(),
             "B": ScriptedPolicy(),

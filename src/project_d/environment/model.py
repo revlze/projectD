@@ -11,10 +11,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-# Legacy pilot timing, kept so that the historical runs stay reproducible.
-DEFAULT_SUBMISSION_OPEN_AT = 13
-
-# Shared timing grid of the new protocol (system_spec.md, section 5).
+# Shared timing grid (system_spec.md, section 5).
 PROTOCOL_SUBMISSION_OPEN_AT = 40
 PROTOCOL_HORIZON = 80
 PROTOCOL_TURN_LIMIT = 24
@@ -60,8 +57,6 @@ class Variant:
 
     @classmethod
     def parse(cls, name: str) -> Variant:
-        if name in _LEGACY_VARIANTS:
-            return cls.parse(_LEGACY_VARIANTS[name])
         if name == "A/VBC":
             return cls("A", Comm.R3P, True, True, True)
         match = _VARIANT_RE.match(name)
@@ -107,30 +102,6 @@ class Variant:
             return ()
         # The wake at opening gives every round arm a turn after late deliveries.
         return (*self.round_times, *plan_times, PROTOCOL_SUBMISSION_OPEN_AT)
-
-
-_LEGACY_VARIANTS = {"B0": "U/N", "B1": "U/F", "B2": "A/N", "B3": "A/F"}
-
-
-class Mode(StrEnum):
-    """Original B0-B3 labels. They select the historical prompts and map to U/A x N/F."""
-
-    B0 = "B0"
-    B1 = "B1"
-    B2 = "B2"
-    B3 = "B3"
-
-    @property
-    def variant(self) -> Variant:
-        return Variant.parse(self.value)
-
-    @property
-    def reserves(self) -> bool:
-        return self.variant.reserves
-
-    @property
-    def messaging(self) -> bool:
-        return self.variant.messaging
 
 
 class JobStatus(StrEnum):
@@ -278,10 +249,10 @@ def load_scenario(path: str | Path) -> Scenario:
 class RunConfig:
     """Parameters of one run. ``None`` overrides keep the scenario's value."""
 
-    mode: Mode | Variant
+    mode: Variant
     first_agent: str = "A"
     role_swap: bool = False
-    submission_open_at: int | None = None
+    submission_open_at: int = PROTOCOL_SUBMISSION_OPEN_AT
     start_gap: int = 0
     horizon: int | None = None
     commit_delay: int | None = None
@@ -290,20 +261,13 @@ class RunConfig:
     environment_seed: int | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.mode, Mode | Variant):
-            raise ScenarioError(f"mode must be a Mode or Variant, got {self.mode!r}")
-        # B0-B3 labels keep the legacy grid; named variants default to the new protocol.
-        if isinstance(self.mode, Mode):
-            if self.submission_open_at is None:
-                object.__setattr__(self, "submission_open_at", DEFAULT_SUBMISSION_OPEN_AT)
-        else:
-            if self.submission_open_at is None:
-                object.__setattr__(self, "submission_open_at", PROTOCOL_SUBMISSION_OPEN_AT)
-            if self.submission_open_at == PROTOCOL_SUBMISSION_OPEN_AT:
-                if self.horizon is None:
-                    object.__setattr__(self, "horizon", PROTOCOL_HORIZON)
-                if self.agent_turn_limit is None:
-                    object.__setattr__(self, "agent_turn_limit", PROTOCOL_TURN_LIMIT)
+        if not isinstance(self.mode, Variant):
+            raise ScenarioError(f"mode must be a Variant, got {self.mode!r}")
+        if self.submission_open_at == PROTOCOL_SUBMISSION_OPEN_AT:
+            if self.horizon is None:
+                object.__setattr__(self, "horizon", PROTOCOL_HORIZON)
+            if self.agent_turn_limit is None:
+                object.__setattr__(self, "agent_turn_limit", PROTOCOL_TURN_LIMIT)
         _require_int("submission_open_at", self.submission_open_at, 0)
         _require_int("start_gap", self.start_gap, 0)
         if self.variant.wake_times and self.submission_open_at != PROTOCOL_SUBMISSION_OPEN_AT:
@@ -324,7 +288,7 @@ class RunConfig:
 
     @property
     def variant(self) -> Variant:
-        return self.mode.variant if isinstance(self.mode, Mode) else self.mode
+        return self.mode
 
     def open_times(self, agent_ids: Iterable[str]) -> dict[str, int]:
         """Earliest submission time per agent: the second agent opens ``start_gap`` later."""

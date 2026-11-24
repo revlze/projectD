@@ -95,6 +95,8 @@ class OpenAICompatibleClient:
         try:
             choice = raw["choices"][0]
             message = choice["message"]
+            if not isinstance(message, dict):
+                raise TypeError("message must be an object")
         except (KeyError, IndexError, TypeError) as exc:
             raise LLMTransportError(f"malformed response: {str(raw)[:300]}") from exc
         return ChatResponse(message, choice.get("finish_reason"), raw.get("usage") or {}, latency_s)

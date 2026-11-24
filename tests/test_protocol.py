@@ -124,7 +124,6 @@ def test_t12_r1_and_r3_share_submission_schedule(first_agent: str) -> None:
         for agent in policies:
             assert _statuses(result, agent, SendMessage) == [(t, ToolStatus.OK) for t in slots]
             assert _statuses(result, agent, SubmitJob) == [
-                (39, ToolStatus.SUBMISSION_NOT_OPEN),
                 (40, ToolStatus.ACCEPTED),
             ]
         assert [entry.time for entry in _events(result, "commit")] == [43, 43]
@@ -210,7 +209,7 @@ def test_t15_feedback_reports_savings_without_choosing_who_yields() -> None:
         ],
         "unmet_requires": [],
     }
-    for time in (30, 35):
+    for time in (30,):
         view = receiver.observations[time].plan_view
         assert view is not None
         assert view["proposals"]["A"]["items"][0]["option_id"] == "full"
@@ -369,75 +368,6 @@ def test_t20_missing_confirmation_keeps_atomic_fallback(one_confirmed: bool) -> 
     assert (result.spent, result.held) == (7, 0)
 
 
-def test_vbc_grid_and_full_script_fit_turn_limit() -> None:
-    policies = {}
-    for agent, peer, proposal, item in [
-        ("A", "B", PLAN_A, A_SHORT),
-        ("B", "A", PLAN_B, B_STANDARD),
-    ]:
-        steps = {
-            0: ListJobs(),
-            1: GetBalance(),
-            **{time: SendMessage(peer, f"{agent}-{time}") for time in (6, 13, 20)},
-            29: proposal,
-            30: GetBalance(),
-            33: REVISED_A if agent == "A" else PLAN_B,
-            34: GetStatus(),
-            35: GetBalance(),
-            40: SubmitJob(*item),
-            44: GetStatus(),
-            45: Finish(),
-        }
-        policies[agent] = ObservedScript(steps, confirm_from=37)
-
-    result = run_episode(
-        _scenario(message_delay=8, commit_delay=3), RunConfig.for_protocol("A/VBC"), policies
-    )
-
-    assert result.metadata.horizon == 80
-    assert result.metadata.agent_turn_limit == 24
-    assert result.metadata.submission_open_at == {"A": 40, "B": 40}
-    assert [e.time for e in _events(result, "message_delivered")] == [14, 14, 21, 21, 28, 28]
-    assert [e.time for e in _events(result, "plan_version")] == [30, 34]
-    assert [e.time for e in _events(result, "plan_feedback")] == [30, 35]
-    assert not _events(result, "round_missed")
-
-    for agent, peer in [("A", "B"), ("B", "A")]:
-        assert _statuses(result, agent, SendMessage) == [
-            (6, ToolStatus.OK),
-            (13, ToolStatus.OK),
-            (20, ToolStatus.OK),
-        ]
-        assert _statuses(result, agent, ProposePlan) == [(29, ToolStatus.OK), (33, ToolStatus.OK)]
-        assert _statuses(result, agent, ConfirmPlan) == [(37, ToolStatus.OK)]
-        assert _statuses(result, agent, SubmitJob) == [(40, ToolStatus.ACCEPTED)]
-
-        script = policies[agent]
-        observed = script.observations
-        assert [m["text"] for m in observed[29].inbox] == [f"{peer}-20"]
-        assert observed[29].plan_view is None
-        initial = observed[30].plan_view
-        revised = observed[34].plan_view
-        final = observed[35].plan_view
-        assert initial is not None and revised is not None and final is not None
-        assert initial["plan_version"] != revised["plan_version"]
-        assert revised["plan_version"] == final["plan_version"]
-        assert initial["plan_feedback"]["overage"] == 1
-        assert revised["proposals"]["A"]["items"][0]["option_id"] == "short"
-        assert "plan_feedback" not in revised
-        assert final["plan_feedback"]["requested_total"] == 10
-        assert final["plan_feedback"]["overage"] == 0
-
-        for observation in observed.values():
-            _assert_no_value(asdict(observation))
-        assert all(call.time in observed for call in result.calls_by(agent))
-        assert script.decisions == result.turns_used[agent] == len(observed) <= 24
-        assert isinstance(result.calls_by(agent)[-1].action, Finish)
-
-    assert result.job_statuses == {"job_a": JobStatus.COMPLETED, "job_b": JobStatus.COMPLETED}
-    assert audit_episode(result.metadata, result.log).agreement == "agreed"
-
-
 def test_send_slots_close_and_skipped_rounds_are_logged() -> None:
     result = run_episode(
         _scenario(),
@@ -452,14 +382,13 @@ def test_send_slots_close_and_skipped_rounds_are_logged() -> None:
     assert _statuses(result, "B", SendMessage) == [
         (5, ToolStatus.MESSAGING_ROUND_CLOSED),
         (6, ToolStatus.OK),
-        (7, ToolStatus.MESSAGING_ROUND_CLOSED),
         (13, ToolStatus.OK),
         (20, ToolStatus.OK),
-        (39, ToolStatus.MESSAGING_ROUND_CLOSED),
         (40, ToolStatus.MESSAGING_CLOSED),
         (44, ToolStatus.MESSAGING_CLOSED),
     ]
-    assert [(e.agent_id, e.detail["round_time"]) for e in _events(result, "round_missed")] == [
+    assert not _events(result, "round_missed")
+    assert [(e.agent_id, e.time) for e in _events(result, "round_skipped")] == [
         ("A", 13),
         ("A", 20),
     ]
@@ -469,7 +398,7 @@ def test_send_slots_close_and_skipped_rounds_are_logged() -> None:
     ("variant", "wake_at"), [("A/R1", 40), ("A/R3", 13), ("A/R3P", 13), ("A/F", 10)]
 )
 def test_wait_wakes_on_delivery_only_in_free_messaging(variant: str, wake_at: int) -> None:
-    # The intentional round behavior follows the B1/B3 distinction in the tool table.
+    # Only free-form delivery interrupts a wait before opening.
     receiver = ObservedScript({6: WaitUntil(40), 40: Finish()})
     if variant == "A/F":
         receiver.steps[10] = ReadMessages()

@@ -16,11 +16,9 @@ from project_d.environment.actions import (
     WaitUntil,
 )
 from project_d.environment.env import Environment
-from project_d.environment.journal import write_jsonl
 from project_d.environment.model import (
     AgentSpec,
     Job,
-    Mode,
     Option,
     RunConfig,
     Scenario,
@@ -28,7 +26,7 @@ from project_d.environment.model import (
 )
 from project_d.evaluation.audit import audit_episode
 from project_d.simulation.scheduler import ScriptedPolicy, run_episode
-from support import make_config, make_scenario
+from support import make_scenario
 
 
 def dependent_scenario() -> Scenario:
@@ -153,7 +151,8 @@ def test_shown_message_is_still_returned_by_read() -> None:
     assert env.take_inbox("B")[0]["text"] == "plan"
     assert env.unread_count("B") == 0
     assert env.take_inbox("B") == ()
-    assert env.execute("B", ReadMessages()).data["messages"][0]["text"] == "plan"
+    env.advance_to(40)
+    assert env.execute("B", ReadMessages()).status.value == "wrong_phase"
 
 
 def test_r1_sleeper_gets_turn_at_opening_after_late_delivery() -> None:
@@ -161,7 +160,7 @@ def test_r1_sleeper_gets_turn_at_opening_after_late_delivery() -> None:
     env = Environment(make_scenario(), config)
     env.advance_to(6)
     env.execute("A", SendMessage("B", "plan"))
-    env.execute("B", WaitUntil(80))
+    env.suspend_until("B", 80, "between_rounds")
     env.advance_to(39)
     assert not env.is_ready("B")
     env.advance_to(40)
@@ -182,17 +181,6 @@ def test_named_variants_default_to_new_grid(name: str) -> None:
     config = RunConfig(mode=Variant.parse(name))
     resolved = config.apply(make_scenario())
     assert (config.submission_open_at, resolved.horizon, resolved.agent_turn_limit) == (40, 80, 24)
-
-
-@pytest.mark.parametrize("mode", list(Mode))
-def test_legacy_payload_and_journal_header_are_unchanged(mode: Mode, tmp_path) -> None:
-    env = Environment(make_scenario(), make_config(mode))
-    result = env.execute("A", SubmitJob("job_a", "full"))
-    assert set(result.data) == {"request_id", "job_id", "option_id", "cost", "commit_at"}
-    path = tmp_path / "episode.jsonl"
-    write_jsonl(path, env.metadata, env.log)
-    header = json.loads(path.read_text(encoding="utf-8").splitlines()[0])["metadata"]
-    assert not {"variant", "requires", "catalog"} & set(header)
 
 
 def test_malformed_plan_is_refused_without_crashing() -> None:

@@ -7,8 +7,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-_LEGACY_LABELS = {"B0", "B1", "B2", "B3"}
-
 
 @dataclass(frozen=True)
 class EpisodeMetadata:
@@ -28,6 +26,9 @@ class EpisodeMetadata:
     requires: dict[str, list[str]] = field(default_factory=dict)
     # Owner, cost and duration per option for the audit. Hidden values are never stored here.
     catalog: dict[str, dict[str, Any]] = field(default_factory=dict)
+    preparation_turn_limit: int = 12
+    execution_turn_limit: int = 12
+    protocol_version: str = ""
 
 
 @dataclass(frozen=True)
@@ -54,11 +55,10 @@ def write_jsonl(path: str | Path, metadata: EpisodeMetadata, entries: list[LogEn
     """Write the metadata as the first line, then one log entry per line."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("w", encoding="utf-8") as handle:
+    temporary = target.with_suffix(target.suffix + ".tmp")
+    with temporary.open("w", encoding="utf-8", newline="\n") as handle:
         header = asdict(metadata)
-        if metadata.mode in _LEGACY_LABELS:
-            for name in ("variant", "requires", "catalog"):
-                del header[name]
         handle.write(json.dumps({"metadata": header}, ensure_ascii=False) + "\n")
         for entry in entries:
             handle.write(json.dumps(asdict(entry), ensure_ascii=False) + "\n")
+    temporary.replace(target)

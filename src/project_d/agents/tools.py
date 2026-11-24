@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from typing import Any
 
 from project_d.environment.actions import (
@@ -16,11 +17,12 @@ from project_d.environment.actions import (
     ProposePlan,
     ReadMessages,
     SendMessage,
+    SkipRound,
     SubmitJob,
     ToolResult,
     WaitUntil,
 )
-from project_d.environment.model import Mode, Variant
+from project_d.environment.model import Comm, Variant
 
 
 def _tool(
@@ -46,10 +48,14 @@ def _tool(
 
 _BASE_TOOLS = (
     _tool("list_jobs", "Показать свои работы, их варианты, стоимость и длительность."),
-    _tool("get_balance", "Показать доступный остаток общего бюджета на текущий момент."),
+    _tool(
+        "get_balance",
+        "Показать общий budget и снимок доступного available; снимок не резервирует деньги.",
+    ),
     _tool(
         "submit_job",
-        "Подать заявку на запуск одного варианта своей работы.",
+        "Подать свой вариант после submission_open_at. accepted означает принятие, "
+        "не завершение; отказ не запускает работу.",
         {
             "job_id": {"type": "string", "description": "Идентификатор работы"},
             "option_id": {"type": "string", "description": "Идентификатор варианта"},
@@ -58,12 +64,14 @@ _BASE_TOOLS = (
     _tool("get_status", "Показать состояние своих работ и последней заявки."),
     _tool(
         "wait_until",
-        "Ждать до указанного логического времени. Новое сообщение может прервать ожидание.",
+        "Ждать до времени позже текущего и не позже horizon. Среда будит при открытии "
+        "подачи и назначенной фазе; в F также при доставке до открытия.",
         {"target_time": {"type": "integer", "description": "Время позже текущего"}},
     ),
     _tool(
         "finish",
-        "Завершить участие в эпизоде. Это необратимо: после finish подать заявки уже нельзя.",
+        "После индивидуального открытия завершить участие. До открытия finish_not_open. "
+        "Принятые работы продолжаются после выхода.",
     ),
 )
 
@@ -118,6 +126,7 @@ _ARGUMENTS: dict[str, tuple[str, ...]] = {
     "read_messages": (),
     "wait_until": ("target_time",),
     "finish": (),
+    "skip_round": (),
     "propose_plan": ("items",),
     "confirm_plan": ("plan_version",),
 }
@@ -127,13 +136,27 @@ _OPTIONAL_ARGUMENTS: dict[str, tuple[str, ...]] = {
 }
 
 
-def tool_schemas(mode: Mode | Variant) -> list[dict[str, Any]]:
-    variant = mode.variant if isinstance(mode, Mode) else mode
-    return [
+def tool_schemas(variant: Variant, phase: str | None = None) -> list[dict[str, Any]]:
+    schemas = [
         *_BASE_TOOLS,
         *(_MESSAGE_TOOLS if variant.messaging else ()),
         *(_PLAN_TOOLS if variant.structured else ()),
     ]
+    if variant.round_times:
+        schemas.append(_tool("skip_round", "Явно пропустить текущий раунд сообщений."))
+    if phase == "message_round":
+        allowed = {"send_message", "skip_round"}
+    elif phase in ("preparation", "execution_wait"):
+        allowed = {"list_jobs", "get_balance", "get_status", "wait_until"}
+        if variant.comm is Comm.F:
+            allowed |= {"send_message", "read_messages"}
+    elif phase == "execution":
+        allowed = {"list_jobs", "get_balance", "get_status", "wait_until", "submit_job", "finish"}
+        if variant.comm is Comm.F:
+            allowed.add("read_messages")
+    else:
+        return deepcopy(schemas)
+    return deepcopy([schema for schema in schemas if schema["function"]["name"] in allowed])
 
 
 def _parse_pairs(raw: Any) -> tuple[tuple[str, str], ...] | None:
@@ -180,6 +203,8 @@ def parse_tool_call(name: Any, raw_arguments: Any) -> Action:
             return ReadMessages()
         case "finish":
             return Finish()
+        case "skip_round":
+            return SkipRound()
         case "submit_job":
             if not all(isinstance(v, str) for v in arguments.values()):
                 return InvalidCall(name, "arguments_must_be_strings")

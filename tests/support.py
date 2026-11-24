@@ -1,8 +1,8 @@
-"""Shared builders for mechanism tests. Parameters are explicit, independent of data/examples."""
+"""Shared builders for mechanism tests. Parameters are explicit, independent of research inputs."""
 
 from __future__ import annotations
 
-from project_d.environment.model import AgentSpec, Job, Mode, Option, RunConfig, Scenario
+from project_d.environment.model import AgentSpec, Job, Option, RunConfig, Scenario, Variant
 
 
 def make_scenario(
@@ -34,6 +34,6 @@ def make_scenario(
     )
 
 
-def make_config(mode: Mode, **overrides: object) -> RunConfig:
+def make_config(mode: Variant, **overrides: object) -> RunConfig:
     overrides.setdefault("submission_open_at", 0)
     return RunConfig(mode=mode, **overrides)  # type: ignore[arg-type]

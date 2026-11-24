@@ -13,6 +13,7 @@ class ToolStatus(StrEnum):
     INSUFFICIENT_BUDGET = "insufficient_budget"
     TOO_LATE = "too_late"
     SUBMISSION_NOT_OPEN = "submission_not_open"
+    FINISH_NOT_OPEN = "finish_not_open"
     UNKNOWN_JOB = "unknown_job"
     NOT_OWNER = "not_owner"
     UNKNOWN_OPTION = "unknown_option"
@@ -83,6 +84,11 @@ class Finish:
 
 
 @dataclass(frozen=True)
+class SkipRound:
+    pass
+
+
+@dataclass(frozen=True)
 class ProposePlan:
     """Own (job_id, option_id) pairs. Costs always come from the catalog, never from the agent."""
 
@@ -113,6 +119,7 @@ Action = (
     | ReadMessages
     | WaitUntil
     | Finish
+    | SkipRound
     | ProposePlan
     | ConfirmPlan
     | InvalidCall

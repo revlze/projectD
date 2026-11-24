@@ -145,8 +145,13 @@ class _PlanAudit:
             self.issues.append(f"expected one agreement row, found {self.agreement_rows}")
 
 
-def audit_episode(metadata: EpisodeMetadata, entries: Iterable[LogEntry]) -> AuditReport:
-    variant = Variant.parse(metadata.variant or metadata.mode)
+def audit_episode(
+    metadata: EpisodeMetadata, entries: Iterable[LogEntry], *, require_complete: bool = False
+) -> AuditReport:
+    # Historical journals remain readable; these aliases are not executable protocols.
+    historical = {"B0": "U/N", "B1": "U/F", "B2": "A/N", "B3": "A/F"}
+    name = metadata.variant or metadata.mode
+    variant = Variant.parse(historical.get(name, name))
     reserving = variant.reserves
     budget = metadata.budget
     spent = held = max_spent = max_total = last_time = plan_mismatches = 0
@@ -157,9 +162,71 @@ def audit_episode(metadata: EpisodeMetadata, entries: Iterable[LogEntry]) -> Aud
     finished_jobs: set[str] = set()
     issues: list[str] = []
     plans = _PlanAudit(metadata, variant, issues)
+    phase_counts = {
+        agent: {"preparation": 0, "execution": 0} for agent in metadata.submission_open_at
+    }
+    endings = 0
+    sends: dict[int, LogEntry] = {}
+    delivered: dict[int, str] = {}
 
-    for entry in entries:
+    for index, entry in enumerate(entries):
         where = f"seq {entry.seq} ({entry.event_type})"
+        if entry.seq != index:
+            issues.append(f"{where}: journal sequence is incomplete")
+        if entry.scenario_id != metadata.scenario_id or entry.mode != metadata.mode:
+            issues.append(f"{where}: episode identity differs from metadata")
+        if not 0 <= entry.time <= metadata.horizon:
+            issues.append(f"{where}: event lies outside the episode horizon")
+        if (entry.spent_before, entry.held_before) != (spent, held):
+            issues.append(f"{where}: budget before transition differs from rebuilt state")
+        if entry.event_type == "decision":
+            phase = (
+                "preparation"
+                if entry.time < min(metadata.submission_open_at.values())
+                else "execution"
+            )
+            counts = phase_counts.get(entry.agent_id or "")
+            if counts is None:
+                issues.append(f"{where}: unknown decision owner")
+            else:
+                counts[phase] += 1
+                limit = getattr(metadata, f"{phase}_turn_limit")
+                if counts[phase] > limit or entry.detail != {
+                    "phase": phase,
+                    "phase_turn": counts[phase],
+                    "phase_limit": limit,
+                }:
+                    issues.append(f"{where}: invalid phase decision budget")
+        elif entry.event_type == "episode_end":
+            endings += 1
+            if entry.time != metadata.horizon or entry.detail.get("turns") != phase_counts:
+                issues.append(f"{where}: invalid episode completion record")
+        elif metadata.protocol_version and entry.event_type == "finish" and entry.result == "ok":
+            if entry.time < metadata.submission_open_at.get(entry.agent_id or "", 0):
+                issues.append(f"{where}: finished before individual opening")
+        elif entry.event_type == "send_message" and entry.result == "ok":
+            message_id = entry.detail["message_id"]
+            sends[message_id] = entry
+            if entry.detail["deliver_at"] != entry.time + max(1, metadata.message_delay):
+                issues.append(f"{where}: incorrect delivery time")
+        elif entry.event_type == "message_delivered":
+            message_id = entry.detail["message_id"]
+            sent = sends.get(message_id)
+            if (
+                sent is None
+                or sent.detail["deliver_at"] != entry.time
+                or sent.detail["to"] != entry.agent_id
+            ):
+                issues.append(f"{where}: delivery differs from sent message")
+            if message_id in delivered:
+                issues.append(f"{where}: message delivered twice")
+            delivered[message_id] = entry.agent_id or ""
+        elif entry.event_type in ("message_read", "read_messages") and entry.result == "ok":
+            if any(
+                delivered.get(item) != entry.agent_id
+                for item in entry.detail.get("message_ids", ())
+            ):
+                issues.append(f"{where}: message shown before delivery or to the wrong owner")
         request_id = entry.request_id
         if entry.time < last_time:
             issues.append(f"{where}: time moved backwards")
@@ -264,6 +331,8 @@ def audit_episode(metadata: EpisodeMetadata, entries: Iterable[LogEntry]) -> Aud
         for r in sorted(set(committed) - set(completed))
     )
     plans.finish()
+    if require_complete and endings != 1:
+        issues.append(f"expected one episode completion record, found {endings}")
 
     return AuditReport(
         total_spent=spent,

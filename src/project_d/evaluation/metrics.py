@@ -9,7 +9,7 @@ from typing import Any
 
 from project_d.environment.actions import ToolStatus
 from project_d.environment.journal import EpisodeMetadata, LogEntry
-from project_d.environment.model import DEFAULT_SUBMISSION_OPEN_AT, Job, Option, Scenario
+from project_d.environment.model import PROTOCOL_SUBMISSION_OPEN_AT, Job, Option, Scenario
 from project_d.evaluation.audit import AuditReport, audit_episode
 
 
@@ -51,12 +51,12 @@ def _schedule(
 
 def optimal_utility(
     scenario: Scenario,
-    submission_open_at: int | Mapping[str, int] = DEFAULT_SUBMISSION_OPEN_AT,
+    submission_open_at: int | Mapping[str, int] = PROTOCOL_SUBMISSION_OPEN_AT,
 ) -> tuple[int, tuple[PlannedJob, ...]]:
     """Return U* and one feasible optimizer.
 
     Pass the opening time or per-agent times for the intended timing grid.
-    The default matches the legacy RunConfig. The scenario supplies the horizon
+    The default matches RunConfig. The scenario supplies the horizon
     and commit delay. Same-user dependencies make agent schedules independent
     once the portfolio meets the shared budget.
     """

@@ -16,11 +16,11 @@ from project_d.environment.actions import (
     WaitUntil,
 )
 from project_d.environment.env import Environment
-from project_d.environment.model import JobStatus, Mode, RunConfig, ScenarioError, load_scenario
+from project_d.environment.model import JobStatus, RunConfig, ScenarioError, Variant, load_scenario
 from project_d.evaluation.audit import audit_episode
 from support import make_config, make_scenario
 
-EXAMPLES = Path(__file__).parents[1] / "data" / "examples"
+EXAMPLES = Path(__file__).parents[1] / "tests" / "fixtures" / "scenarios"
 SUBMIT_A = SubmitJob("job_a", "full")
 SUBMIT_B = SubmitJob("job_b", "standard")
 
@@ -29,8 +29,8 @@ def drain(env: Environment) -> None:
     env.advance_to(env.scenario.horizon)
 
 
-def test_t01_b0_race_overspends() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B0))
+def test_t01_unsafe_race_overspends() -> None:
+    env = Environment(make_scenario(), make_config(Variant.parse("U/N")))
     assert env.execute("A", SUBMIT_A).status is ToolStatus.ACCEPTED
     assert env.execute("B", SUBMIT_B).status is ToolStatus.ACCEPTED
     assert env.spent == 0
@@ -41,8 +41,8 @@ def test_t01_b0_race_overspends() -> None:
     assert report.consistent, report.issues
 
 
-def test_t02_b2_reservation_refuses_second() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B2))
+def test_t02_atomic_reservation_refuses_second() -> None:
+    env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
     assert env.execute("A", SUBMIT_A).status is ToolStatus.ACCEPTED
     assert env.held == 7
     balance = env.available
@@ -55,9 +55,9 @@ def test_t02_b2_reservation_refuses_second() -> None:
     assert not report.violated and report.consistent
 
 
-def test_t03_b0_fitting_jobs_complete() -> None:
+def test_t03_unsafe_fitting_jobs_complete() -> None:
     scenario = make_scenario(a_options=(("full", 5),))
-    env = Environment(scenario, make_config(Mode.B0))
+    env = Environment(scenario, make_config(Variant.parse("U/N")))
     env.execute("A", SUBMIT_A)
     env.execute("B", SUBMIT_B)
     drain(env)
@@ -67,8 +67,8 @@ def test_t03_b0_fitting_jobs_complete() -> None:
     assert not report.violated
 
 
-def test_t04_b0_request_after_commit_is_refused() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B0))
+def test_t04_unsafe_request_after_commit_is_refused() -> None:
+    env = Environment(make_scenario(), make_config(Variant.parse("U/N")))
     env.execute("A", SUBMIT_A)
     env.advance_to(2)
     assert env.spent == 7
@@ -77,9 +77,9 @@ def test_t04_b0_request_after_commit_is_refused() -> None:
     assert not audit_episode(env.metadata, env.log).violated
 
 
-def test_t05_b2_short_option_fits_and_second_option_is_forbidden() -> None:
+def test_t05_atomic_short_option_fits_and_second_option_is_forbidden() -> None:
     scenario = make_scenario(a_options=(("full", 7), ("short", 4)))
-    env = Environment(scenario, make_config(Mode.B2))
+    env = Environment(scenario, make_config(Variant.parse("A/N")))
     assert env.execute("A", SubmitJob("job_a", "short")).status is ToolStatus.ACCEPTED
     assert env.execute("B", SUBMIT_B).status is ToolStatus.ACCEPTED
     assert env.execute("A", SubmitJob("job_a", "full")).status is ToolStatus.JOB_ALREADY_ACCEPTED
@@ -88,8 +88,8 @@ def test_t05_b2_short_option_fits_and_second_option_is_forbidden() -> None:
     assert audit_episode(env.metadata, env.log).consistent
 
 
-@pytest.mark.parametrize("mode", [Mode.B0, Mode.B2])
-def test_t06_repeated_request_id_does_not_double_charge(mode: Mode) -> None:
+@pytest.mark.parametrize("mode", [Variant.parse("U/N"), Variant.parse("A/N")])
+def test_t06_repeated_request_id_does_not_double_charge(mode: Variant) -> None:
     env = Environment(make_scenario(), make_config(mode))
     action = SubmitJob("job_a", "full", request_id="req-1")
     first = env.execute("A", action)
@@ -102,7 +102,7 @@ def test_t06_repeated_request_id_does_not_double_charge(mode: Mode) -> None:
 
 
 def test_request_id_cannot_be_reused_for_a_different_call() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B2))
+    env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
     env.execute("A", SubmitJob("job_a", "full", request_id="req-1"))
     result = env.execute("B", SubmitJob("job_b", "standard", request_id="req-1"))
     assert result.status is ToolStatus.REQUEST_ID_CONFLICT
@@ -119,14 +119,14 @@ def test_request_id_cannot_be_reused_for_a_different_call() -> None:
     ],
 )
 def test_t08_invalid_submission_leaves_budget(agent, action, expected) -> None:
-    env = Environment(make_scenario(), make_config(Mode.B2))
+    env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
     assert env.execute(agent, action).status is expected
     assert (env.spent, env.held, env.available) == (0, 0, 12)
 
 
 def test_t08_too_late_boundary() -> None:
     scenario = make_scenario(horizon=5, commit_delay=2, duration=2)
-    env = Environment(scenario, make_config(Mode.B2))
+    env = Environment(scenario, make_config(Variant.parse("A/N")))
     env.advance_to(1)
     assert env.execute("A", SUBMIT_A).status is ToolStatus.ACCEPTED
     env.advance_to(2)
@@ -136,8 +136,8 @@ def test_t08_too_late_boundary() -> None:
     assert env.spent == 7
 
 
-@pytest.mark.parametrize("mode", list(Mode))
-def test_t09_submission_before_open(mode: Mode) -> None:
+@pytest.mark.parametrize("mode", [Variant.parse(name) for name in ("U/N", "U/F", "A/N", "A/F")])
+def test_t09_submission_before_open(mode: Variant) -> None:
     env = Environment(make_scenario(), RunConfig(mode=mode, submission_open_at=13))
     env.advance_to(12)
     result = env.execute("A", SUBMIT_A)
@@ -153,7 +153,9 @@ def test_t09_submission_before_open(mode: Mode) -> None:
 
 
 def test_start_gap_opens_second_agent_later() -> None:
-    config = RunConfig(mode=Mode.B0, first_agent="B", submission_open_at=13, start_gap=2)
+    config = RunConfig(
+        mode=Variant.parse("U/N"), first_agent="B", submission_open_at=13, start_gap=2
+    )
     env = Environment(make_scenario(), config)
     assert env.submission_open_at == {"A": 15, "B": 13}
     env.advance_to(14)
@@ -162,14 +164,14 @@ def test_start_gap_opens_second_agent_later() -> None:
 
 
 def test_list_jobs_hides_value_and_foreign_jobs() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B0))
+    env = Environment(make_scenario(), make_config(Variant.parse("U/N")))
     result = env.execute("A", ListJobs())
     assert [job["job_id"] for job in result.data["jobs"]] == ["job_a"]
     assert "value" not in str(asdict(result))
 
 
 def test_status_and_balance_are_visible_to_agent() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B2))
+    env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
     env.execute("A", SUBMIT_A)
     assert env.execute("B", GetBalance()).data["available"] == 5
     status = env.execute("A", GetStatus())
@@ -180,13 +182,13 @@ def test_status_and_balance_are_visible_to_agent() -> None:
 
 @pytest.mark.parametrize("target", [0, 31])
 def test_wait_rejects_out_of_range_target(target: int) -> None:
-    env = Environment(make_scenario(), make_config(Mode.B0))
+    env = Environment(make_scenario(), make_config(Variant.parse("U/N")))
     assert env.execute("A", WaitUntil(target)).status is ToolStatus.INVALID_WAIT
     assert env.is_ready("A")
 
 
-@pytest.mark.parametrize("mode", [Mode.B0, Mode.B2])
-def test_messaging_is_disabled_without_communication(mode: Mode) -> None:
+@pytest.mark.parametrize("mode", [Variant.parse("U/N"), Variant.parse("A/N")])
+def test_messaging_is_disabled_without_communication(mode: Variant) -> None:
     env = Environment(make_scenario(), RunConfig(mode=mode))
     assert env.execute("A", SendMessage("B", "hi")).status is ToolStatus.MESSAGING_DISABLED
     assert env.execute("A", ReadMessages()).status is ToolStatus.MESSAGING_DISABLED
@@ -194,7 +196,7 @@ def test_messaging_is_disabled_without_communication(mode: Mode) -> None:
 
 def test_message_is_never_delivered_in_the_same_step() -> None:
     scenario = make_scenario(message_delay=0)
-    env = Environment(scenario, RunConfig(mode=Mode.B1))
+    env = Environment(scenario, RunConfig(mode=Variant.parse("U/F")))
     assert env.execute("A", SendMessage("B", "hi")).data["deliver_at"] == 1
     assert env.execute("B", ReadMessages()).data["messages"] == []
     env.advance_to(1)
@@ -202,13 +204,13 @@ def test_message_is_never_delivered_in_the_same_step() -> None:
 
 
 def test_message_after_preparation_is_refused() -> None:
-    env = Environment(make_scenario(), RunConfig(mode=Mode.B1, submission_open_at=13))
+    env = Environment(make_scenario(), RunConfig(mode=Variant.parse("U/F"), submission_open_at=13))
     env.advance_to(13)
     assert env.execute("A", SendMessage("B", "hi")).status is ToolStatus.MESSAGING_CLOSED
 
 
 def test_role_swap_moves_jobs_with_requests() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B0, role_swap=True))
+    env = Environment(make_scenario(), make_config(Variant.parse("U/N"), role_swap=True))
     assert env.execute("A", SubmitJob("job_a", "full")).status is ToolStatus.UNKNOWN_JOB
     assert env.execute("A", SubmitJob("job_b", "standard")).status is ToolStatus.ACCEPTED
     assert env.scenario.agents[0].user_request == "request of B"
@@ -219,7 +221,7 @@ def test_all_example_scenarios_load_without_leaking_value() -> None:
     assert len(paths) == 20
     for path in paths:
         scenario = load_scenario(path)
-        env = Environment(scenario, RunConfig(mode=Mode.B3))
+        env = Environment(scenario, RunConfig(mode=Variant.parse("A/F")))
         for agent in env.processing_order:
             assert "value" not in str(asdict(env.execute(agent, ListJobs())))
 
@@ -245,7 +247,7 @@ def test_loader_rejects_invalid_scenarios(mutation: dict) -> None:
 
 
 def test_foreign_job_is_indistinguishable_for_agent_but_logged() -> None:
-    env = Environment(make_scenario(), make_config(Mode.B0))
+    env = Environment(make_scenario(), make_config(Variant.parse("U/N")))
     foreign = env.execute("A", SubmitJob("job_b", "standard"))
     missing = env.execute("A", SubmitJob("nope", "standard"))
     assert foreign.status is missing.status is ToolStatus.UNKNOWN_JOB

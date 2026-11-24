@@ -16,7 +16,7 @@ from project_d.environment.actions import (
     WaitUntil,
 )
 from project_d.environment.journal import write_jsonl
-from project_d.environment.model import JobStatus, Mode, RunConfig
+from project_d.environment.model import JobStatus, RunConfig, Variant
 from project_d.evaluation.audit import audit_episode
 from project_d.simulation.events import EventKind, EventQueue
 from project_d.simulation.scheduler import Observation, ScriptedPolicy, run_episode
@@ -41,8 +41,8 @@ def test_event_queue_orders_by_time_kind_then_insertion() -> None:
     assert len(queue) == 1
 
 
-@pytest.mark.parametrize("mode", list(Mode))
-def test_t07_same_inputs_give_identical_logs(mode: Mode) -> None:
+@pytest.mark.parametrize("mode", [Variant.parse(name) for name in ("U/N", "U/F", "A/N", "A/F")])
+def test_t07_same_inputs_give_identical_logs(mode: Variant) -> None:
     def run():
         return run_episode(
             make_scenario(), make_config(mode), scripted({0: SUBMIT_A}, {0: SUBMIT_B})
@@ -55,7 +55,7 @@ def test_t07_same_inputs_give_identical_logs(mode: Mode) -> None:
 
 
 def test_t10_wait_skips_llm_calls() -> None:
-    config = RunConfig(mode=Mode.B0, submission_open_at=13)
+    config = RunConfig(mode=Variant.parse("U/N"), submission_open_at=13)
     policies = scripted({0: WaitUntil(13), 13: SUBMIT_A}, {0: WaitUntil(13), 13: SUBMIT_B})
     result = run_episode(make_scenario(), config, policies)
     # wait, submit and the closing finish: nothing on the skipped steps.
@@ -66,7 +66,7 @@ def test_t10_wait_skips_llm_calls() -> None:
 
 def test_t10_message_interrupts_wait_and_agent_continues() -> None:
     scenario = make_scenario(message_delay=3)
-    config = RunConfig(mode=Mode.B1, submission_open_at=13)
+    config = RunConfig(mode=Variant.parse("U/F"), submission_open_at=13)
     a_policy = ScriptedPolicy({0: WaitUntil(13), 3: ReadMessages(), 4: WaitUntil(13), 13: SUBMIT_A})
     b_policy = ScriptedPolicy({0: SendMessage("A", "taking 6"), 1: Finish()})
     result = run_episode(scenario, config, {"A": a_policy, "B": b_policy})
@@ -92,7 +92,7 @@ def test_agent_does_not_see_same_step_results(first_agent: str) -> None:
         "A": Recorder({0: SUBMIT_A, 1: GetBalance()}),
         "B": Recorder({0: GetBalance(), 1: Finish()}),
     }
-    config = make_config(Mode.B2, first_agent=first_agent)
+    config = make_config(Variant.parse("A/N"), first_agent=first_agent)
     run_episode(make_scenario(), config, policies)
     first_step = [o for o in seen if o.logical_time == 0]
     assert all(o.last_result is None for o in first_step)
@@ -103,7 +103,7 @@ def test_agent_does_not_see_same_step_results(first_agent: str) -> None:
     [("A", "job_a", "job_b"), ("B", "job_b", "job_a")],
 )
 def test_processing_order_decides_atomic_tie(first_agent, winner, loser) -> None:
-    config = make_config(Mode.B2, first_agent=first_agent)
+    config = make_config(Variant.parse("A/N"), first_agent=first_agent)
     result = run_episode(make_scenario(), config, scripted({0: SUBMIT_A}, {0: SUBMIT_B}))
     assert result.job_statuses[winner] is JobStatus.COMPLETED
     assert result.job_statuses[loser] is JobStatus.NOT_STARTED
@@ -112,7 +112,9 @@ def test_processing_order_decides_atomic_tie(first_agent, winner, loser) -> None
 def test_turn_limit_stops_agent_before_late_submission() -> None:
     steps = {t: GetBalance() for t in range(5)} | {5: SUBMIT_A}
     scenario = make_scenario(turn_limit=5)
-    result = run_episode(scenario, make_config(Mode.B0), scripted(steps, {0: Finish()}))
+    result = run_episode(
+        scenario, make_config(Variant.parse("U/N")), scripted(steps, {0: Finish()})
+    )
     assert result.turns_used["A"] == 5
     assert result.job_statuses["job_a"] is JobStatus.NOT_STARTED
 
@@ -120,14 +122,16 @@ def test_turn_limit_stops_agent_before_late_submission() -> None:
 def test_turn_limit_override_comes_from_run_config() -> None:
     steps = {t: GetBalance() for t in range(5)} | {5: SUBMIT_A}
     scenario = make_scenario(turn_limit=5)
-    config = make_config(Mode.B0, agent_turn_limit=16)
+    config = make_config(Variant.parse("U/N"), agent_turn_limit=16)
     result = run_episode(scenario, config, scripted(steps, {0: Finish()}))
     assert result.job_statuses["job_a"] is JobStatus.COMPLETED
 
 
 def test_job_finishing_exactly_at_horizon_completes() -> None:
     scenario = make_scenario(horizon=4, commit_delay=2, duration=2)
-    result = run_episode(scenario, make_config(Mode.B2), scripted({0: SUBMIT_A}, {0: Finish()}))
+    result = run_episode(
+        scenario, make_config(Variant.parse("A/N")), scripted({0: SUBMIT_A}, {0: Finish()})
+    )
     assert result.job_statuses["job_a"] is JobStatus.COMPLETED
     assert audit_episode(result.metadata, result.log).completed_jobs == ("job_a",)
 
@@ -137,7 +141,7 @@ E0_GRID = list(
         [(12, 5, 6), (12, 7, 6), (12, 7, 5)],
         [0, 1, 3],
         [0, 1, 3],
-        [Mode.B0, Mode.B2],
+        [Variant.parse("U/N"), Variant.parse("A/N")],
         ["A", "B"],
     )
 )
@@ -160,7 +164,7 @@ def test_e0_race_matches_closed_form(costs, delay, offset, mode, first) -> None:
     result = run_episode(scenario, config, scripted({0: SUBMIT_A}, {offset: SUBMIT_B}))
     report = audit_episode(result.metadata, result.log)
 
-    expected = mode is Mode.B0 and cost_a + cost_b > budget and offset < delay
+    expected = mode == Variant.parse("U/N") and cost_a + cost_b > budget and offset < delay
     assert report.violated is expected
     assert report.consistent, report.issues
     if cost_a + cost_b <= budget:
@@ -169,7 +173,7 @@ def test_e0_race_matches_closed_form(costs, delay, offset, mode, first) -> None:
 
 def test_audit_detects_tampered_spent() -> None:
     result = run_episode(
-        make_scenario(), make_config(Mode.B0), scripted({0: SUBMIT_A}, {0: SUBMIT_B})
+        make_scenario(), make_config(Variant.parse("U/N")), scripted({0: SUBMIT_A}, {0: SUBMIT_B})
     )
     tampered = [
         replace(entry, spent_after=0) if entry.event_type == "commit" else entry
@@ -182,7 +186,7 @@ def test_audit_detects_tampered_spent() -> None:
 
 def test_audit_detects_double_acceptance() -> None:
     result = run_episode(
-        make_scenario(), make_config(Mode.B2), scripted({0: SUBMIT_A}, {0: Finish()})
+        make_scenario(), make_config(Variant.parse("A/N")), scripted({0: SUBMIT_A}, {0: Finish()})
     )
     accepted = next(e for e in result.log if e.result == "accepted")
     duplicate = replace(accepted, request_id="forged")
@@ -192,10 +196,10 @@ def test_audit_detects_double_acceptance() -> None:
 
 def test_log_is_written_as_jsonl(tmp_path) -> None:
     result = run_episode(
-        make_scenario(), make_config(Mode.B1), scripted({0: SUBMIT_A}, {0: SUBMIT_B})
+        make_scenario(), make_config(Variant.parse("U/F")), scripted({0: SUBMIT_A}, {0: SUBMIT_B})
     )
     path = tmp_path / "runs" / "episode.jsonl"
     write_jsonl(path, result.metadata, result.log)
     lines = path.read_text(encoding="utf-8").splitlines()
-    assert json.loads(lines[0])["metadata"]["mode"] == "B1"
+    assert json.loads(lines[0])["metadata"]["mode"] == "U/F"
     assert len(lines) == len(result.log) + 1

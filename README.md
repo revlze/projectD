@@ -2,7 +2,7 @@
 
 Research project on coordinating LLM agents that compete for a shared, limited resource. The goal is to study how coordination mechanisms (reservation, locking, negotiation, etc.) behave under concurrency, reproduce race conditions in a controlled simulator, and check the key safety properties with a formal TLA+ model.
 
-The research design and target contracts are in [docs/protocol.md](docs/protocol.md), [docs/system_spec.md](docs/system_spec.md), and [docs/experiments.md](docs/experiments.md). The current implementation does not yet satisfy all of these contracts; the experiment document distinguishes the planned matrix from the implemented one. Existing E1 logs are diagnostic development results, not the final comparison.
+The research design and target contracts are in [docs/protocol.md](docs/protocol.md), [docs/system_spec.md](docs/system_spec.md), and [docs/experiments.md](docs/experiments.md). Existing E1 logs are diagnostic development results, not the final comparison.
 
 ## Structure
 
@@ -16,10 +16,9 @@ project-d/
 │   ├── evaluation/     metrics and analysis of runs
 │   └── experiments/    scenario generation, validation and experiment entrypoint
 ├── formal/tla/         TLA+ specifications of the abstract model
-├── tests/
+├── tests/              checks and historical unit-test fixtures
 ├── data/
-│   ├── scenarios/      10 dev + 28 test profiles and their SHA-256 manifest
-│   └── examples/       historical pilot inputs still used by tests and the pilot CLI
+│   └── scenarios/      10 dev + 28 test profiles and their SHA-256 manifest
 ├── results/e1/         preserved diagnostic dev logs from commit fcca9f7
 └── outputs/            run outputs (ignored by git)
 ```
@@ -45,4 +44,10 @@ uv run python -m project_d.experiments.generator --check data/scenarios
 uv run python -m project_d.experiments.matrix E1 --dry-run
 ```
 
-The dry run currently reports 560 episodes; the target E1 has 640. It does not establish readiness to run the target protocol. Do not launch E2-E4 until the contract, matrix and resume checks described in the experiment document are implemented and reviewed. Regenerate data only into a separate scratch directory with `generator --out PATH`; do not overwrite the tracked sample to fix a validation failure. Scenario JSON uses LF on every platform, enforced by `.gitattributes`.
+Dry runs describe the complete research matrix: E1=640, E2=1232, E3=240, E4-H1=144 and E4-delay=96 new episodes. The LLM runner accepts the ten baseline variants. Structured variants require the separate VBC implementation stage and are rejected before any episode request. Select the development baseline subset with:
+
+```bash
+uv run python -m project_d.experiments.matrix E1 --baseline-only --dry-run
+```
+
+The research entrypoint is `project_d.experiments.matrix`. Test series require `--allow-test` and the full selection. Each output directory has an immutable configuration manifest; resume checks complete artifacts and their SHA-256 receipt. Failed attempts are retained under `attempts/`. Scenario JSON uses LF on every platform. Generate data only into a scratch directory with `generator --out PATH`; the tracked sample remains fixed.

@@ -16,9 +16,9 @@ def test_growing_history_is_clean() -> None:
     assert context_problem(episode(("A", 900), ("B", 800), ("A", 1200)), 16384) is None
 
 
-def test_falling_prompt_size_is_truncation() -> None:
+def test_falling_prompt_size_is_only_a_usage_warning() -> None:
     problem = context_problem(episode(("A", 4080), ("A", 3979)), 16384)
-    assert problem is not None and problem.startswith("context_truncated")
+    assert problem is not None and problem.startswith("context_usage_drop")
 
 
 def test_agents_are_compared_separately() -> None:

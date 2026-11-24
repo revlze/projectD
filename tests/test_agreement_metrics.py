@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import json
-import re
-
 import pytest
 
-from project_d.agents.llm_client import ChatResponse
 from project_d.agents.runner import run_llm_episode
 from project_d.environment.actions import ConfirmPlan, ProposePlan, SubmitJob
 from project_d.environment.model import RunConfig
@@ -105,49 +101,10 @@ def test_mismatched_confirmations_are_not_an_agreement() -> None:
     assert metrics.agreed_total is None
 
 
-class PlanClient:
-    """Proposes, confirms and submits, and records every prompt it receives."""
+def test_vbc_llm_execution_is_blocked_before_any_request() -> None:
+    class NoCalls:
+        def chat(self, messages, tools):
+            raise AssertionError("No LLM call is permitted")
 
-    def __init__(self) -> None:
-        self.prompts: dict[tuple[str, int], str] = {}
-
-    def chat(self, messages, tools) -> ChatResponse:
-        agent = "A" if "агент A и" in messages[0]["content"] else "B"
-        note = messages[-1]["content"]
-        now = int(re.search(r"logical_time=(\d+)", note).group(1))
-        self.prompts[agent, now] = note
-        job, option = ("job_a", "full") if agent == "A" else ("job_b", "standard")
-        if now == 29:
-            name, args = "propose_plan", {"items": [{"job_id": job, "option_id": option}]}
-        elif now == 37:
-            name, args = "confirm_plan", {"plan_version": 2}
-        elif now == 40:
-            name, args = "submit_job", {"job_id": job, "option_id": option}
-        elif now < 40:
-            name, args = "wait_until", {"target_time": 40}
-        else:
-            name, args = "finish", {}
-        call = {"id": "c", "function": {"name": name, "arguments": json.dumps(args)}}
-        return ChatResponse({"role": "assistant", "content": "", "tool_calls": [call]})
-
-
-def test_llm_turn_records_feedback_that_is_really_in_the_prompt() -> None:
-    client = PlanClient()
-    episode = run_llm_episode(make_scenario(), RunConfig.for_protocol("A/VBC"), client)
-    at_confirm = [turn for turn in episode.turns if turn.logical_time == 37]
-    assert len(at_confirm) == 2
-    for turn in at_confirm:
-        assert turn.shown_plan["plan_version"] == 2
-        assert turn.shown_plan["feedback_shown"] is True
-        assert turn.shown_plan["overage"] == 1
-        assert '"overage": 1' in client.prompts[turn.agent_id, 37]
-    assert all(t.shown_plan is None for t in episode.turns if t.logical_time < 30)
-    triples = [(t.agent_id, t.logical_time, t.shown_plan) for t in episode.turns]
-    metrics = agreement_metrics(episode.result.log, 12, triples)
-    assert metrics.v_warning_status == "warned_and_confirmed"
-
-
-def test_without_v_the_prompt_has_no_feedback() -> None:
-    episode = run_llm_episode(make_scenario(), RunConfig.for_protocol("A/R3P+S+G"), PlanClient())
-    at_confirm = [turn for turn in episode.turns if turn.logical_time == 37]
-    assert all(turn.shown_plan["feedback_shown"] is False for turn in at_confirm)
+    with pytest.raises(ValueError, match="VBC implementation stage"):
+        run_llm_episode(make_scenario(), RunConfig.for_protocol("A/VBC"), NoCalls())
