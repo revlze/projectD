@@ -272,6 +272,26 @@ def _server_version(base_url: str) -> str | None:
         return None
 
 
+def _model_card(llm: LLMConfig) -> dict[str, Any] | None:
+    """Weights file and parameters, so an alias such as a thread-limited copy is traceable."""
+    url = llm.base_url.rstrip("/").removesuffix("/v1") + "/api/show"
+    request = urllib.request.Request(url, data=json.dumps({"model": llm.model}).encode("utf-8"))
+    try:
+        with urllib.request.urlopen(request, timeout=5) as response:
+            card = json.loads(response.read().decode("utf-8"))
+    except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError):
+        return None
+    weights = next(
+        (
+            line.split()[1]
+            for line in card.get("modelfile", "").splitlines()
+            if line.startswith("FROM ")
+        ),
+        None,
+    )
+    return {"weights": weights and Path(weights).name, "parameters": card.get("parameters")}
+
+
 def loaded_context_length(llm: LLMConfig) -> int | None:
     """Load the model with a minimal request and read the context the server actually gave it."""
     OpenAICompatibleClient(replace(llm, max_tokens=1)).chat([{"role": "user", "content": "ok"}], [])
@@ -306,6 +326,7 @@ def run_manifest(llm: LLMConfig, base_seed: int, context_length: int) -> dict[st
         "context_length": context_length,
         "llm_base_seed": base_seed,
         "server_version": _server_version(llm.base_url),
+        "model_card": _model_card(llm),
         "hardware": hardware(),
         # Only meaningful when the server shares this environment, as on a vast.ai pod.
         "ollama_env": {name: os.environ.get(name) for name in SERVER_ENV},
