@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+import shutil
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path
@@ -9,11 +10,17 @@ import pytest
 
 from project_d.environment.model import Scenario, load_scenario
 from project_d.evaluation.metrics import optimal_utility
-from project_d.experiments.generator import generate, profile_key
+from project_d.experiments.generator import generate, profile_key, validate_dataset
+from project_d.experiments.matrix import DATA_ROOT
 
 
-@pytest.fixture(scope="module")
-def dataset(tmp_path_factory: pytest.TempPathFactory) -> tuple[Path, dict]:
+@pytest.fixture(scope="module", params=("generated", "repository"))
+def dataset(
+    request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory
+) -> tuple[Path, dict]:
+    if request.param == "repository":
+        path = Path(__file__).resolve().parents[1] / DATA_ROOT
+        return path, json.loads((path / "manifest.json").read_bytes())
     path = tmp_path_factory.mktemp("protocol")
     return path, generate(path)
 
@@ -33,7 +40,9 @@ def test_determinism(dataset: tuple[Path, dict], tmp_path: Path) -> None:
 def test_manifest_counts_hashes_and_e3_subset(dataset: tuple[Path, dict]) -> None:
     path, manifest = dataset
     assert json.loads((path / "manifest.json").read_bytes()) == manifest
-    assert {str(file.relative_to(path)) for file in path.glob("*/*.json")} == set(manifest["files"])
+    assert {file.relative_to(path).as_posix() for file in path.glob("*/*.json")} == set(
+        manifest["files"]
+    )
     counts = Counter()
     e3_counts = Counter()
     e3_strata: dict[str, set[tuple[int, ...]]] = {}
@@ -65,6 +74,7 @@ def test_manifest_counts_hashes_and_e3_subset(dataset: tuple[Path, dict]) -> Non
     assert e3_counts == {"S1": 3, "S2": 3, "S3": 3, "S4": 3}
     assert all(strata == {(1, 1), (2, 2), (3, 3)} for strata in e3_strata.values())
     assert manifest["e4_message_delays"] == [1, 4, 8]
+    assert validate_dataset(path) == manifest
 
 
 def test_constraints_and_no_duplicates_or_leakage(dataset: tuple[Path, dict]) -> None:
@@ -140,3 +150,30 @@ def test_family_properties(dataset: tuple[Path, dict]) -> None:
                 assert b_root.options[1].cost + a_full.cost <= scenario.budget
                 assert {a_root.job_id, b_root.job_id} <= chosen.keys()
                 assert "short" in (chosen[a_root.job_id], chosen[b_root.job_id])
+
+
+@pytest.mark.parametrize("mutation", ("bytes", "extra_file", "features", "u_star", "e3"))
+def test_validation_rejects_changed_dataset(
+    dataset: tuple[Path, dict], tmp_path: Path, mutation: str
+) -> None:
+    source, _ = dataset
+    root = tmp_path / "scenarios"
+    shutil.copytree(source, root)
+    manifest_path = root / "manifest.json"
+    manifest = json.loads(manifest_path.read_bytes())
+    relative = "dev/dev_s0_01.json"
+    if mutation == "bytes":
+        profile = root / relative
+        profile.write_bytes(profile.read_bytes().replace(b"\n", b"\r\n"))
+    elif mutation == "extra_file":
+        (root / "dev/extra.json").write_bytes(b"{}\n")
+    else:
+        if mutation == "features":
+            manifest["files"][relative]["features"]["dependency_edges"] += 1
+        elif mutation == "u_star":
+            manifest["files"][relative]["u_star"] += 1
+        else:
+            manifest["e3_subset"] = manifest["e3_subset"][1:]
+        manifest_path.write_bytes((json.dumps(manifest) + "\n").encode("utf-8"))
+    with pytest.raises(ValueError):
+        validate_dataset(root)

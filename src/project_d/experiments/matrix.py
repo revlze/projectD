@@ -38,9 +38,10 @@ from project_d.environment.model import (
 )
 from project_d.evaluation.audit import audit_episode
 from project_d.evaluation.metrics import agreement_metrics, episode_metrics
+from project_d.experiments.generator import validate_dataset
 from project_d.simulation.scheduler import ScriptedPolicy, run_episode
 
-DATA_ROOT = Path("data/protocol_v2")
+DATA_ROOT = Path("data/scenarios")
 
 # Ollama defaults to 4096 below 24 GiB of VRAM and then silently drops the start of the history.
 REQUIRED_CONTEXT = 16384
@@ -122,7 +123,7 @@ class EpisodeSpec:
 
 
 def load_manifest(data_root: Path) -> dict[str, Any]:
-    return json.loads((data_root / "manifest.json").read_text(encoding="utf-8"))
+    return validate_dataset(data_root)
 
 
 def verify_profiles(data_root: Path, manifest: dict[str, Any], profiles: Iterable[str]) -> None:

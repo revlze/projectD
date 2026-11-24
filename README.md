@@ -2,7 +2,7 @@
 
 Research project on coordinating LLM agents that compete for a shared, limited resource. The goal is to study how coordination mechanisms (reservation, locking, negotiation, etc.) behave under concurrency, reproduce race conditions in a controlled simulator, and check the key safety properties with a formal TLA+ model.
 
-The structure deliberately does not commit to a particular coordination mechanism or LLM framework yet.
+The research design and target contracts are in [docs/protocol.md](docs/protocol.md), [docs/system_spec.md](docs/system_spec.md), and [docs/experiments.md](docs/experiments.md). The current implementation does not yet satisfy all of these contracts; the experiment document distinguishes the planned matrix from the implemented one. Existing E1 logs are diagnostic development results, not the final comparison.
 
 ## Structure
 
@@ -13,14 +13,14 @@ project-d/
 │   ├── agents/         agent logic; acts on the environment only via tools
 │   ├── environment/    shared resource and the effects of actions on it
 │   ├── simulation/     event ordering and delays (reproducible interleavings)
-│   └── evaluation/     metrics and analysis of runs
-├── experiments/
-│   └── configs/        experiment configurations
+│   ├── evaluation/     metrics and analysis of runs
+│   └── experiments/    scenario generation, validation and experiment entrypoint
 ├── formal/tla/         TLA+ specifications of the abstract model
 ├── tests/
 ├── data/
-│   ├── examples/       small hand-written inputs (tracked)
-│   └── generated/      generated data (ignored by git)
+│   ├── scenarios/      10 dev + 28 test profiles and their SHA-256 manifest
+│   └── examples/       historical pilot inputs still used by tests and the pilot CLI
+├── results/e1/         preserved diagnostic dev logs from commit fcca9f7
 └── outputs/            run outputs (ignored by git)
 ```
 
@@ -37,3 +37,12 @@ uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 ```
+
+Validate the tracked scenarios without LLM calls or rewriting data:
+
+```bash
+uv run python -m project_d.experiments.generator --check data/scenarios
+uv run python -m project_d.experiments.matrix E1 --dry-run
+```
+
+The dry run currently reports 560 episodes; the target E1 has 640. It does not establish readiness to run the target protocol. Do not launch E2-E4 until the contract, matrix and resume checks described in the experiment document are implemented and reviewed. Regenerate data only into a separate scratch directory with `generator --out PATH`; do not overwrite the tracked sample to fix a validation failure. Scenario JSON uses LF on every platform, enforced by `.gitattributes`.

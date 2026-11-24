@@ -1,4 +1,4 @@
-"""Generate the frozen development and test inputs for protocol v2."""
+"""Generate or validate the development and test scenario dataset."""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from project_d.environment.model import (
     Job,
     Option,
     Scenario,
+    load_scenario,
 )
 from project_d.evaluation.metrics import optimal_utility
 
@@ -293,12 +294,97 @@ def generate(out: str | Path, seed: int = DEFAULT_SEED) -> dict:
     return manifest
 
 
+def validate_dataset(root: str | Path) -> dict:
+    """Check the actual dataset without rewriting inputs or their manifest.
+
+    Family and utility checks share the generator's definitions. An independent
+    portfolio oracle and executable schedule checks live in test_scenarios.py.
+    """
+    root = Path(root)
+    manifest_path = root / "manifest.json"
+    manifest_data = manifest_path.read_bytes()
+    if b"\r" in manifest_data:
+        raise ValueError("manifest.json must use LF line endings")
+    manifest = json.loads(manifest_data)
+    expected_files = {
+        f"{split}/{split}_{family.lower()}_{slot + 1:02d}.json": (family, shape)
+        for split in ("dev", "test")
+        for family in FAMILIES
+        for slot, shape in enumerate(
+            DEV_SHAPES if split == "dev" else TEST_SHAPES[:4] if family == "S0" else TEST_SHAPES
+        )
+    }
+    actual_files = {path.relative_to(root).as_posix() for path in root.rglob("*.json")}
+    if actual_files != set(expected_files) | {"manifest.json"}:
+        raise ValueError("dataset must contain exactly the 10 dev and 28 test profiles")
+    if set(manifest["files"]) != set(expected_files):
+        raise ValueError("manifest profile inventory differs from the dataset contract")
+    expected_e3 = [
+        f"test/test_{family.lower()}_{slot + 1:02d}.json"
+        for family in FAMILIES[1:]
+        for slot in E3_SLOTS
+    ]
+    if manifest["e3_subset"] != expected_e3:
+        raise ValueError("E3 subset must use the fixed (1,1), (2,2), (3,3) strata")
+    if manifest["submission_open_at"] != PROTOCOL_SUBMISSION_OPEN_AT:
+        raise ValueError("manifest has an unexpected submission opening")
+    if manifest["e4_message_delays"] != list(E4_DELAYS):
+        raise ValueError("manifest has unexpected E4 message delays")
+
+    seen = set()
+    for relative, (family, shape) in expected_files.items():
+        data = (root / relative).read_bytes()
+        record = manifest["files"][relative]
+        if b"\r" in data or hashlib.sha256(data).hexdigest() != record["sha256"]:
+            raise ValueError(f"{relative}: bytes differ from the LF manifest SHA-256")
+        scenario = load_scenario(root / relative)
+        if scenario.scenario_id != Path(relative).stem or scenario.family != family:
+            raise ValueError(f"{relative}: scenario ID or family differs from its path")
+        if tuple(agent.agent_id for agent in scenario.agents) != ("A", "B"):
+            raise ValueError(f"{relative}: expected two agents A and B")
+        if tuple(len(agent.jobs) for agent in scenario.agents) != shape:
+            raise ValueError(f"{relative}: unexpected job-count stratum")
+        if any(
+            not 1 <= option.duration <= 6
+            for agent in scenario.agents
+            for job in agent.jobs
+            for option in job.options
+        ):
+            raise ValueError(f"{relative}: option duration must be between 1 and 6")
+        timing = (
+            scenario.horizon,
+            scenario.agent_turn_limit,
+            scenario.commit_delay,
+            scenario.message_delay,
+        )
+        if timing != (PROTOCOL_HORIZON, PROTOCOL_TURN_LIMIT, 2, 1):
+            raise ValueError(f"{relative}: unexpected base timing or turn limit")
+        if record["family"] != family or record["features"] != _features(scenario):
+            raise ValueError(f"{relative}: manifest features differ from the profile")
+        optimum, plan = _optimize(scenario)
+        if record["u_star"] != optimum or optimum <= 0:
+            raise ValueError(f"{relative}: manifest U* differs from the computed optimum")
+        if not _family_holds(scenario, optimum, plan):
+            raise ValueError(f"{relative}: family constraints do not hold")
+        key = profile_key(scenario)
+        if key in seen:
+            raise ValueError(f"{relative}: duplicate economic profile across dev/test")
+        seen.add(key)
+    return manifest
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--out", type=Path, required=True)
+    operation = parser.add_mutually_exclusive_group(required=True)
+    operation.add_argument("--out", type=Path)
+    operation.add_argument("--check", type=Path, help="Validate existing files without rewriting")
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     args = parser.parse_args()
-    generate(args.out, args.seed)
+    if args.check is not None:
+        manifest = validate_dataset(args.check)
+        print(json.dumps({"profiles": len(manifest["files"]), "status": "valid"}))
+    else:
+        generate(args.out, args.seed)
 
 
 if __name__ == "__main__":
