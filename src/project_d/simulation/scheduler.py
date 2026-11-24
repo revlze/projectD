@@ -192,9 +192,9 @@ def run_episode(
             turns[agent_id][budget_phase] += 1
             last_results[agent_id] = result
             calls.append(ToolCall(time, agent_id, decisions[agent_id], result))
-            if not env.variant.structured and time in env.variant.round_times:
+            if time in env.variant.slot_times:
                 target = next(
-                    (slot for slot in env.variant.round_times if slot > time),
+                    (slot for slot in env.variant.slot_times if slot > time),
                     config.submission_open_at,
                 )
                 env.suspend_until(agent_id, target, "between_rounds")

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import pytest
 
-from project_d.agents.runner import run_llm_episode
 from project_d.environment.actions import ConfirmPlan, ProposePlan, SubmitJob
 from project_d.environment.model import RunConfig
 from project_d.evaluation.metrics import agreement_metrics
@@ -13,14 +12,14 @@ from support import make_scenario
 def scripted_run(variant: str, cost_a: int = 7, b_version: int = 2):
     a = ScriptedPolicy(
         {
-            29: ProposePlan((("job_a", "full"),)),
+            6: ProposePlan((("job_a", "full"),)),
             37: ConfirmPlan(2),
             40: SubmitJob("job_a", "full"),
         }
     )
     b = ScriptedPolicy(
         {
-            29: ProposePlan((("job_b", "standard"),)),
+            6: ProposePlan((("job_b", "standard"),)),
             37: ConfirmPlan(b_version),
             40: SubmitJob("job_b", "standard"),
         }
@@ -60,7 +59,7 @@ def test_valid_agreement_and_completion() -> None:
     assert metrics.v_warning_status is None
 
 
-def test_over_budget_after_warning_is_a_coordination_error() -> None:
+def test_t29_over_budget_after_warning_is_a_coordination_error() -> None:
     result = scripted_run("A/VBC")
     metrics = agreement_metrics(result.log, 12, shown(2, 1))
     assert metrics.agreed and metrics.agreed_over_budget
@@ -87,7 +86,7 @@ def test_missing_warning_is_not_called_ignored(seen: list[tuple]) -> None:
 
 
 def test_over_budget_without_v_is_labelled() -> None:
-    metrics = agreement_metrics(scripted_run("A/R3P+S+G").log, 12)
+    metrics = agreement_metrics(scripted_run("A/S+G").log, 12)
     assert metrics.agreed_over_budget is True
     assert metrics.v_warned_agents is None
     assert metrics.v_warning_status == "no_v"
@@ -101,10 +100,12 @@ def test_mismatched_confirmations_are_not_an_agreement() -> None:
     assert metrics.agreed_total is None
 
 
-def test_vbc_llm_execution_is_blocked_before_any_request() -> None:
-    class NoCalls:
-        def chat(self, messages, tools):
-            raise AssertionError("No LLM call is permitted")
-
-    with pytest.raises(ValueError, match="VBC implementation stage"):
-        run_llm_episode(make_scenario(), RunConfig.for_protocol("A/VBC"), NoCalls())
+def test_t31_agreed_work_counts_only_completions_by_the_horizon() -> None:
+    result = scripted_run("A/VBC", cost_a=5)
+    completions = sorted(e.time for e in result.log if e.event_type == "complete")
+    assert len(completions) == 2
+    for horizon in range(completions[0] - 1, completions[-1] + 2):
+        metrics = agreement_metrics(result.log, 12, shown(2, 0), horizon=horizon)
+        expected = sum(time <= horizon for time in completions)
+        assert metrics.agreed_jobs_completed == expected
+        assert metrics.agreed_plan_completed is (expected == 2)

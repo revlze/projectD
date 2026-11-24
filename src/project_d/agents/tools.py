@@ -146,6 +146,10 @@ def tool_schemas(variant: Variant, phase: str | None = None) -> list[dict[str, A
         schemas.append(_tool("skip_round", "Явно пропустить текущий раунд сообщений."))
     if phase == "message_round":
         allowed = {"send_message", "skip_round"}
+    elif phase == "propose":
+        allowed = {"propose_plan", "wait_until"}
+    elif phase == "confirm":
+        allowed = {"confirm_plan", "wait_until"}
     elif phase in ("preparation", "execution_wait"):
         allowed = {"list_jobs", "get_balance", "get_status", "wait_until"}
         if variant.comm is Comm.F:

@@ -144,12 +144,15 @@ def test_matrix_contains_only_unique_new_test_conditions():
     assert len(conditions) == 1712
 
 
-def test_pending_vbc_and_duplicate_keys_are_rejected_before_any_request(tmp_path):
-    for specs in ([replace(SPEC, variant="A/VBC")], [SPEC, SPEC]):
-        with pytest.raises(ValueError):
-            run_specs(
-                specs, ROOT, tmp_path, lambda _: pytest.fail("No client creation"), run_identity={}
-            )
+def test_duplicate_keys_are_rejected_before_any_request(tmp_path):
+    with pytest.raises(ValueError):
+        run_specs(
+            [SPEC, SPEC],
+            ROOT,
+            tmp_path,
+            lambda _: pytest.fail("No client creation"),
+            run_identity={},
+        )
     assert not list(tmp_path.iterdir())
 
 

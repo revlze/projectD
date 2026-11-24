@@ -256,7 +256,9 @@ def summarize_episode(
         "audit_issues": len(audit.issues),
     }
     shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in episode.turns]
-    row |= asdict(agreement_metrics(result.log, result.metadata.budget, shown))
+    row |= asdict(
+        agreement_metrics(result.log, result.metadata.budget, shown, result.metadata.horizon)
+    )
     resolved = spec.run_config(scenario).apply(scenario)
     row["primary_completed"] = {
         agent.agent_id: {
@@ -390,8 +392,6 @@ def run_specs(
     """Resume only identical, complete episodes; preserve failed attempts before retrying."""
     if not specs or len({spec.name for spec in specs}) != len(specs):
         raise ValueError("Episode selection must be nonempty and have unique keys")
-    if any(spec.variant not in BASELINE_VARIANTS for spec in specs):
-        raise ValueError("Structured protocols require the separate VBC implementation stage")
     manifest = load_manifest(data_root)
     verify_profiles(data_root, manifest, (spec.profile for spec in specs))
     source_root = Path(__file__).resolve().parents[1]
@@ -427,7 +427,14 @@ def run_specs(
             },
             "tools_sha256": {
                 phase: fingerprint(tool_schemas(config.variant, phase))
-                for phase in ("preparation", "message_round", "execution_wait", "execution")
+                for phase in (
+                    "preparation",
+                    "message_round",
+                    "propose",
+                    "confirm",
+                    "execution_wait",
+                    "execution",
+                )
             },
         }
     identity = {
@@ -582,11 +589,8 @@ def main(argv: list[str] | None = None) -> int:
     ):
         print("The test split runs only as a full series with --allow-test.", file=sys.stderr)
         return 2
-    if not specs or any(spec.variant not in BASELINE_VARIANTS for spec in specs):
-        print(
-            "No runnable baseline selection; VBC requires its separate implementation stage.",
-            file=sys.stderr,
-        )
+    if not specs:
+        print("Empty episode selection.", file=sys.stderr)
         return 2
     verify_profiles(args.data_root, manifest, (spec.profile for spec in specs))
 

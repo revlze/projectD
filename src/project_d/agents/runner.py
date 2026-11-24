@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from project_d.agents.llm_client import ChatClient, LLMTransportError
+from project_d.agents.plan_text import render_plan
 from project_d.agents.prompts import (
     PROMPT_VERSION,
     build_protocol_prompt,
@@ -69,6 +70,23 @@ class LLMPolicy:
         self._pending_ids: list[str] = []
         self._pending_error: str | None = None
         self._missing_call = False
+        self._shown_version: int | None = None
+
+    def _new_plan(self, view: dict[str, Any] | None) -> tuple[str | None, dict[str, Any] | None]:
+        """Render a plan version once, on the first decision after it is published."""
+        if view is None or view["plan_version"] == self._shown_version:
+            return None, None
+        self._shown_version = view["plan_version"]
+        text = render_plan(view, self.agent.agent_id, self.other_agent)
+        feedback = view.get("plan_feedback")
+        shown = {
+            "plan_version": view["plan_version"],
+            "feedback_shown": feedback is not None,
+            "overage": feedback["overage"] if feedback else None,
+            "status": feedback["status"] if feedback else None,
+            "text_sha256": prompt_sha256(text),
+        }
+        return text, shown
 
     def decide(self, observation: Observation) -> Action:
         self._append_previous_outcome(observation)
@@ -77,7 +95,10 @@ class LLMPolicy:
             if observation.logical_time >= observation.submission_open_at
             else "preparation"
         )
-        note = protocol_note(phase, observation.inbox, observation.plan_view, self.other_agent)
+        plan_text, shown_plan = self._new_plan(observation.plan_view)
+        note = protocol_note(
+            phase, observation.inbox, observation.plan_view, self.other_agent, plan_text
+        )
         if phase in ("execution", "execution_wait") and observation.phase_started:
             note += "Началось окно исполнения. Показаны фактические статусы собственных работ.\n"
         window = (
@@ -117,6 +138,7 @@ class LLMPolicy:
                     "",
                     None,
                     0,
+                    shown_plan=shown_plan,
                     request=request,
                     request_sha256=digest,
                     transport_error=str(exc),
@@ -172,6 +194,7 @@ class LLMPolicy:
                 repr(action),
                 self._pending_error,
                 0,
+                shown_plan=shown_plan,
                 request=request,
                 request_sha256=digest,
             )
@@ -199,8 +222,6 @@ class LLMEpisode:
 
 
 def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -> LLMEpisode:
-    if config.variant.structured:
-        raise ValueError("Structured protocols require the separate VBC implementation stage")
     resolved = config.apply(scenario)
     ids = [agent.agent_id for agent in resolved.agents]
     opens = config.open_times(ids)

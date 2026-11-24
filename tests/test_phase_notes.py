@@ -6,6 +6,7 @@ from pathlib import Path
 from project_d.agents.prompts import (
     BASE,
     BUDGET_CHECK_INSTRUCTION,
+    PLAN_INSTRUCTION,
     ROUND_INSTRUCTION,
     free_coordination,
     protocol_note,
@@ -22,16 +23,19 @@ def test_round_note_directs_to_send_and_is_shared_by_round_variants() -> None:
     assert "из 3" not in note
 
 
-def test_propose_note_rules_out_confirmation() -> None:
-    note = protocol_note("propose", (), PLAN, "B")
-    assert "только propose_plan" in note
-    assert "confirm_plan в этой фазе недоступен" in note
+def test_propose_notes_distinguish_first_proposal_and_revision() -> None:
+    first = protocol_note("propose", (), None, "B")
+    revision = protocol_note("propose", (), PLAN, "B")
+    assert "Фаза предложения" in first and "будет отсутствовать" in first
+    assert "Фаза пересмотра" in revision and "последнее корректное предложение" in revision
+    assert "confirm_plan" not in first + revision
 
 
-def test_confirm_note_names_current_version() -> None:
+def test_confirm_note_names_final_version_and_how_to_decline() -> None:
     note = protocol_note("confirm", (), PLAN, "B")
-    assert "Актуальная версия плана: 2" in note
+    assert "Окончательная версия плана: 2" in note
     assert "plan_version=2" in note
+    assert "wait_until(40)" in note
 
 
 def test_notes_never_recommend_who_yields() -> None:
@@ -64,5 +68,7 @@ def test_prompt_fragments_match_approved_specification() -> None:
         line = next(line for line in spec.splitlines() if line.startswith(f"**`{label}`"))
         approved = re.search(r'"([^"]+)"', line).group(1)
         assert actual.startswith(approved)
+    s_line = next(line for line in spec.splitlines() if line.startswith("Используем `BASE`"))
+    assert re.search(r'"([^"]+)"', s_line).group(1) == PLAN_INSTRUCTION
     assert BASE.index("До планирования вызови list_jobs") < BASE.index("затем get_balance")
     assert "обязательно согласуй план" not in free_coordination("B")[1]

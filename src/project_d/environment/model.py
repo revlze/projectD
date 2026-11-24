@@ -16,9 +16,11 @@ PROTOCOL_SUBMISSION_OPEN_AT = 40
 PROTOCOL_HORIZON = 80
 PROTOCOL_TURN_LIMIT = 24
 ROUND_TIMES = (6, 13, 20)
-PROPOSE_TIMES = (29, 33)
-SNAPSHOT_TIMES = (30, 34)
-FEEDBACK_TIMES = (30, 35)
+# VBC grid (system_spec.md, section 6): proposals, shared versions, negotiation, confirmation.
+PROPOSE_TIMES = (6, 33)
+SNAPSHOT_TIMES = (7, 35)
+FEEDBACK_TIMES = (7, 35)
+VBC_ROUND_TIMES = (13, 20)
 CONFIRM_TIME = 37
 
 
@@ -32,51 +34,67 @@ class Comm(StrEnum):
     R1 = "R1"
     R3 = "R3"
     R3P = "R3P"
+    S = "S"
 
 
-_VARIANT_RE = re.compile(r"^(U|A)/(N|F|R1|R3P|R3)((?:\+[SVG])*)$")
+_VARIANT_RE = re.compile(r"^(U|A)/(N|F|R1|R3P|R3)$")
+
+# The six structured protocols: (verify, guard, negotiation rounds).
+_STRUCTURED = {
+    "A/S": (False, False, 1),
+    "A/S+V": (True, False, 1),
+    "A/S+G": (False, True, 1),
+    "A/VBC": (True, True, 1),
+    "A/VBC-r0": (True, True, 0),
+    "A/VBC-r2": (True, True, 2),
+}
 
 
 @dataclass(frozen=True)
 class Variant:
-    """Execution mechanism, communication protocol and VBC components (decisions D18, D19)."""
+    """Execution mechanism, communication protocol and VBC components (decisions D17-D19).
+
+    Structured variants are a protocol of their own (``comm=S``) with atomic execution, not
+    flags on top of a baseline: proposals, ``rounds`` negotiation rounds and a confirmation.
+    """
 
     execution: str
     comm: Comm
     structured: bool = False
     verify: bool = False
     guard: bool = False
+    rounds: int = 0
 
     def __post_init__(self) -> None:
         if self.execution not in ("U", "A"):
             raise ScenarioError(f"unknown execution {self.execution!r}")
         if (self.verify or self.guard) and not self.structured:
             raise ScenarioError("V and G require S")
-        if self.structured and (self.execution != "A" or self.comm is not Comm.R3P):
-            raise ScenarioError("S, V and G are defined only on top of A/R3P")
+        if self.structured != (self.comm is Comm.S):
+            raise ScenarioError("structured proposals are the S protocol and only it")
+        if self.structured and self.execution != "A":
+            raise ScenarioError("structured protocols use atomic execution")
+        if self.structured and self.rounds not in (0, 1, 2):
+            raise ScenarioError(f"structured protocols have 0-2 rounds, got {self.rounds}")
+        if not self.structured and self.rounds:
+            raise ScenarioError("only structured protocols take a round count")
 
     @classmethod
     def parse(cls, name: str) -> Variant:
-        if name == "A/VBC":
-            return cls("A", Comm.R3P, True, True, True)
+        if name in _STRUCTURED:
+            verify, guard, rounds = _STRUCTURED[name]
+            return cls("A", Comm.S, True, verify, guard, rounds)
         match = _VARIANT_RE.match(name)
         if match is None:
             raise ScenarioError(f"unknown variant {name!r}")
-        flags = match.group(3).split("+")[1:]
-        if flags != sorted(set(flags), key="SVG".index):
-            raise ScenarioError(f"components must be unique and ordered S, V, G: {name!r}")
-        return cls(match.group(1), Comm(match.group(2)), "S" in flags, "V" in flags, "G" in flags)
+        return cls(match.group(1), Comm(match.group(2)))
 
     @property
     def value(self) -> str:
-        if self.structured and self.verify and self.guard:
-            return "A/VBC"
-        flags = "".join(
-            f"+{flag}"
-            for flag, on in (("S", self.structured), ("V", self.verify), ("G", self.guard))
-            if on
-        )
-        return f"{self.execution}/{self.comm.value}{flags}"
+        if self.structured:
+            key = (self.verify, self.guard, self.rounds)
+            return next(name for name, flags in _STRUCTURED.items() if flags == key)
+        return f"{self.execution}/{self.comm.value}"
 
     @property
     def reserves(self) -> bool:
@@ -84,6 +102,8 @@ class Variant:
 
     @property
     def messaging(self) -> bool:
+        if self.structured:
+            return self.rounds > 0
         return self.comm is not Comm.N
 
     @property
@@ -92,16 +112,24 @@ class Variant:
             return ROUND_TIMES[:1]
         if self.comm in (Comm.R3, Comm.R3P):
             return ROUND_TIMES
+        if self.structured:
+            return VBC_ROUND_TIMES[: self.rounds]
         return ()
+
+    @property
+    def slot_times(self) -> tuple[int, ...]:
+        """Mandatory decision slots before opening; between them the environment waits."""
+        if self.structured:
+            return tuple(sorted((*PROPOSE_TIMES, *self.round_times, CONFIRM_TIME)))
+        return self.round_times
 
     @property
     def wake_times(self) -> tuple[int, ...]:
         """Scheduled phases that interrupt a wait. Free-form F has none."""
-        plan_times = (*PROPOSE_TIMES, CONFIRM_TIME) if self.structured else ()
-        if not self.round_times:
+        if not self.slot_times:
             return ()
-        # The wake at opening gives every round arm a turn after late deliveries.
-        return (*self.round_times, *plan_times, PROTOCOL_SUBMISSION_OPEN_AT)
+        # The wake at opening gives every slot protocol a turn after late deliveries.
+        return (*self.slot_times, PROTOCOL_SUBMISSION_OPEN_AT)
 
 
 class JobStatus(StrEnum):

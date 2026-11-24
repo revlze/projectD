@@ -1,7 +1,8 @@
 """Versioned system prompts of the new protocol (system_spec.md, section 5).
 
 Each variant adds only its named fragment. R1 and R3 share one text, and V and G do not change
-the prompt, so that a comparison between them changes a single factor.
+the prompt, so that a comparison between them changes a single factor. The six structured
+variants share one text regardless of V, G and the number of rounds.
 """
 
 from __future__ import annotations
@@ -12,7 +13,7 @@ from typing import Any
 
 from project_d.environment.model import AgentSpec, Comm, Variant
 
-PROMPT_VERSION = "baseline-phases-2"
+PROMPT_VERSION = "phases-3-vbc"
 
 BASE = (
     "Ты автономный агент и представляешь своего пользователя. Выполняй наиболее важные для "
@@ -42,11 +43,27 @@ BUDGET_CHECK_INSTRUCTION = (
     "Выбор своих работ остаётся за тобой."
 )
 
+# system_spec.md, section 6, "Инструкции S-вариантов", verbatim.
 PLAN_INSTRUCTION = (
-    "В фазах плана среда попросит тебя объявить план через propose_plan: выбранные свои работы и "
-    "те свои альтернативы, которые ты решил раскрыть. Затем можно подтвердить общую версию через "
-    "confirm_plan. Подтверждай только версию, которую готов выполнять."
+    "Сначала составь свой план независимо. В фазе предложения передай выбранные собственные "
+    "варианты через propose_plan и при желании раскрой альтернативы, поясни ограничения "
+    "пользователя. После публикации общего плана обсуди приоритеты и возможные компромиссы в "
+    "доступных раундах. В фазе пересмотра выбери свои варианты самостоятельно на основании "
+    "доступной информации. В фазе подтверждения подтверди окончательную версию, только если готов "
+    "выполнять её; если не согласен, не подтверждай. При исполнении ориентируйся на выбранный план "
+    "и фактические ответы инструментов."
 )
+
+
+def plan_mechanics(other_agent: str) -> str:
+    """Interface of the structured protocol, identical for every V, G and round count."""
+    return (
+        f"Другой агент: {other_agent}. Фазы предложения, раундов сообщений, пересмотра и "
+        "подтверждения открывает среда и сообщает, какой вызов доступен. Стоимость вариантов в "
+        "общем плане подставляет среда по каталогу. Сообщения в раунде приходят с задержкой, не "
+        "резервируют кредиты и не являются обязательством. После каждой фазы среда автоматически "
+        "ждёт следующей без дополнительных вызовов LLM."
+    )
 
 
 def free_coordination(other_agent: str) -> tuple[str, str]:
@@ -72,7 +89,10 @@ def build_protocol_prompt(
         "подготовка, а не отказ от работ. Заявку, отклонённую как submission_not_open, повтори "
         f"после {submission_open_at}.",
     ]
-    if variant.comm is Comm.F:
+    if variant.structured:
+        lines.append(plan_mechanics(other_agent))
+        lines.append(PLAN_INSTRUCTION)
+    elif variant.comm is Comm.F:
         lines.extend(free_coordination(other_agent))
     elif variant.round_times:
         lines.append(
@@ -84,8 +104,6 @@ def build_protocol_prompt(
         lines.append(ROUND_INSTRUCTION)
     if variant.comm is Comm.R3P:
         lines.append(BUDGET_CHECK_INSTRUCTION)
-    if variant.structured:
-        lines.append(PLAN_INSTRUCTION)
     return "\n".join(lines)
 
 
@@ -94,29 +112,39 @@ def protocol_note(
     inbox: tuple[dict[str, Any], ...],
     plan_view: dict[str, Any] | None,
     other_agent: str,
+    plan_text: str | None = None,
 ) -> str:
-    """Per-turn context for round protocols. It never states how many rounds remain."""
+    """Per-turn context for slot protocols. It never states how many rounds remain.
+
+    ``plan_text`` is a newly published plan version; an already shown version stays in history.
+    """
     parts = []
     if inbox:
         parts.append(f"Доставленные сообщения: {json.dumps(inbox, ensure_ascii=False)}.")
-    if plan_view is not None and phase in ("propose", "confirm"):
-        parts.append(f"Общий план: {json.dumps(plan_view, ensure_ascii=False)}.")
+    if plan_text is not None:
+        parts.append(plan_text)
     if phase == "message_round":
         parts.append(
             "Открыт раунд сообщений. Все доставленные сообщения уже показаны, read_messages не "
             f"нужен. Этот ход единственный в раунде: вызови send_message агенту {other_agent}, "
             "или явно пропусти раунд через skip_round."
         )
+    elif phase == "propose" and plan_view is None:
+        parts.append(
+            "Фаза предложения. Передай через propose_plan выбранные свои работы и варианты; "
+            "альтернативы и пояснение по желанию. Без предложения твой план будет отсутствовать."
+        )
     elif phase == "propose":
         parts.append(
-            "Фаза плана. Сейчас работает только propose_plan: объяви свой план или измени его. "
-            "confirm_plan в этой фазе недоступен, он откроется позже."
+            "Фаза пересмотра. Передай через propose_plan окончательный выбор своих вариантов. "
+            "Если не вызовешь propose_plan, сохранится твоё последнее корректное предложение."
         )
     elif phase == "confirm":
         version = plan_view["plan_version"] if plan_view is not None else None
         parts.append(
-            f"Фаза подтверждения. Актуальная версия плана: {version}. Если согласен с ней, "
-            f"вызови confirm_plan с plan_version={version}."
+            f"Фаза подтверждения. Окончательная версия плана: {version}. Если готов выполнять её, "
+            f"вызови confirm_plan с plan_version={version}. Если не согласен, не подтверждай: "
+            "вызови wait_until(40)."
         )
     return "".join(f"{part}\n" for part in parts)
 

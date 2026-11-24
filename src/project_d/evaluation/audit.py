@@ -92,7 +92,13 @@ class _PlanAudit:
 
     def confirm(self, entry: LogEntry, where: str) -> None:
         version = entry.detail.get("plan_version")
-        if entry.time != CONFIRM_TIME or version not in self.versions:
+        final = max(self.versions, default=None)
+        if (
+            entry.time != CONFIRM_TIME
+            or version != final
+            or final != len(SNAPSHOT_TIMES)
+            or set(self.versions[final]) != self.agents
+        ):
             self.issues.append(f"{where}: invalid confirmation")
             return
         self.confirmations[entry.agent_id or ""] = version

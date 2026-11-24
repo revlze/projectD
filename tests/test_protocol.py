@@ -8,7 +8,6 @@ from project_d.environment.actions import (
     Action,
     ConfirmPlan,
     Finish,
-    GetBalance,
     GetStatus,
     ListJobs,
     ProposePlan,
@@ -140,10 +139,10 @@ def test_t13_foreign_job_rejected_without_disclosure(field: str) -> None:
     proposal = replace(ProposePlan(()), **{field: (B_STANDARD,)})
 
     def run(scenario):
-        proposer = ObservedScript({29: proposal, 35: Finish()})
+        proposer = ObservedScript({6: proposal})
         result = run_episode(
             scenario,
-            RunConfig.for_protocol("A/R3P+S"),
+            RunConfig.for_protocol("A/S"),
             {
                 "A": proposer,
                 "B": ScriptedPolicy({40: Finish()}),
@@ -165,14 +164,14 @@ def test_t14_only_disclosed_catalog_costs_are_shared() -> None:
     scenario = replace(
         scenario, agents=(replace(agent_a, jobs=(*agent_a.jobs, hidden_job)), agent_b)
     )
-    receiver = ObservedScript({30: ListJobs(), 31: GetStatus(), 35: Finish()})
+    receiver = ObservedScript({0: ListJobs(), 1: GetStatus()})
     result = run_episode(
         scenario,
-        RunConfig.for_protocol("A/R3P+S"),
-        {"A": ScriptedPolicy({29: PLAN_A, 35: Finish()}), "B": receiver},
+        RunConfig.for_protocol("A/S"),
+        {"A": ScriptedPolicy({6: PLAN_A}), "B": receiver},
     )
-    assert _statuses(result, "A", ProposePlan) == [(29, ToolStatus.OK)]
-    observation = receiver.observations[30]
+    assert _statuses(result, "A", ProposePlan) == [(6, ToolStatus.OK)]
+    observation = receiver.observations[13]
     assert {job["job_id"] for job in observation.own_jobs} == {"job_b"}
     assert observation.plan_view is not None
     assert "plan_feedback" not in observation.plan_view
@@ -188,14 +187,14 @@ def test_t14_only_disclosed_catalog_costs_are_shared() -> None:
 
 
 def test_t15_feedback_reports_savings_without_choosing_who_yields() -> None:
-    receiver = ObservedScript({29: PLAN_B, 30: GetBalance(), 35: Finish()})
+    receiver = ObservedScript({6: PLAN_B})
     result = run_episode(
         _scenario(b_options=(("standard", 6), ("undisclosed", 2))),
         RunConfig.for_protocol("A/VBC"),
-        {"A": ScriptedPolicy({29: PLAN_A, 35: Finish()}), "B": receiver},
+        {"A": ScriptedPolicy({6: PLAN_A}), "B": receiver},
     )
 
-    plan = receiver.observations[30].plan_view
+    plan = receiver.observations[13].plan_view
     assert plan is not None
     feedback = plan["plan_feedback"]
     assert feedback == {
@@ -208,8 +207,10 @@ def test_t15_feedback_reports_savings_without_choosing_who_yields() -> None:
             {"agent_id": "A", "job_id": "job_a", "option_id": "short", "saving": 3}
         ],
         "unmet_requires": [],
+        "missing_plans": [],
+        "status": "OVER_BUDGET",
     }
-    for time in (30,):
+    for time in (13, 33, 37):
         view = receiver.observations[time].plan_view
         assert view is not None
         assert view["proposals"]["A"]["items"][0]["option_id"] == "full"
@@ -223,16 +224,17 @@ def test_t16_different_confirmed_versions_trigger_fallback() -> None:
         RunConfig.for_protocol("A/VBC"),
         {
             "A": ObservedScript(
-                {29: PLAN_A, 30: GetBalance(), 33: REVISED_A, 40: SubmitJob(*A_FULL)},
-                confirm_from=30,
+                {6: PLAN_A, 33: REVISED_A, 40: SubmitJob(*A_FULL)},
+                confirm_from=13,
             ),
-            "B": ObservedScript({29: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
+            "B": ObservedScript({6: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
         },
     )
     confirmations = [call.action for call in result.calls if isinstance(call.action, ConfirmPlan)]
     initial, final = (entry.detail["plan_version"] for entry in _events(result, "plan_version"))
     assert initial != final
     assert confirmations == [ConfirmPlan(initial), ConfirmPlan(final)]
+    assert _statuses(result, "A", ConfirmPlan) == [(37, ToolStatus.INVALID_PLAN)]
     assert _statuses(result, "B", ConfirmPlan) == [(37, ToolStatus.OK)]
     assert _statuses(result, "A", SubmitJob) == [(40, ToolStatus.ACCEPTED)]
     assert _statuses(result, "B", SubmitJob) == [(40, ToolStatus.INSUFFICIENT_BUDGET)]
@@ -245,10 +247,10 @@ def test_t17_agreement_rejects_other_option_without_spending() -> None:
         RunConfig.for_protocol("A/VBC"),
         {
             "A": ObservedScript(
-                {29: REVISED_A, 40: SubmitJob(*A_FULL), 41: SubmitJob(*A_SHORT)},
+                {6: REVISED_A, 40: SubmitJob(*A_FULL), 41: SubmitJob(*A_SHORT)},
                 confirm_from=37,
             ),
-            "B": ObservedScript({29: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
+            "B": ObservedScript({6: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
         },
     )
     assert _statuses(result, "A", SubmitJob) == [
@@ -265,15 +267,15 @@ def test_t17_agreement_rejects_other_option_without_spending() -> None:
     assert report.consistent, report.issues
 
 
-@pytest.mark.parametrize("variant", ["A/R3P+S", "A/R3P+S+V", "A/R3P+S+G", "A/VBC"])
+@pytest.mark.parametrize("variant", ["A/S", "A/S+V", "A/S+G", "A/VBC"])
 @pytest.mark.parametrize(("first_agent", "cost"), [("A", 7), ("B", 6)])
 def test_t18_v_g_keep_atomic_budget_rules(variant: str, first_agent: str, cost: int) -> None:
     result = run_episode(
         _scenario(commit_delay=3),
         RunConfig.for_protocol(Variant.parse(variant), first_agent=first_agent),
         {
-            "A": ObservedScript({29: PLAN_A, 40: SubmitJob(*A_FULL)}, confirm_from=37),
-            "B": ObservedScript({29: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
+            "A": ObservedScript({6: PLAN_A, 40: SubmitJob(*A_FULL)}, confirm_from=37),
+            "B": ObservedScript({6: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
         },
     )
     assert result.metadata.variant == variant
@@ -312,7 +314,7 @@ def test_t19_three_sequential_jobs_require_completion_and_fit_horizon() -> None:
         {
             "A": ObservedScript(
                 {
-                    29: ProposePlan(chained),
+                    6: ProposePlan(chained),
                     43: SubmitJob(*A_SHORT),
                     44: SubmitJob(*A_SHORT),
                     52: SubmitJob("followup", "run"),
@@ -322,7 +324,7 @@ def test_t19_three_sequential_jobs_require_completion_and_fit_horizon() -> None:
                 },
                 confirm_from=37,
             ),
-            "B": ObservedScript({29: ProposePlan(()), 40: Finish()}, confirm_from=37),
+            "B": ObservedScript({6: ProposePlan(()), 40: Finish()}, confirm_from=37),
         },
     )
     assert result.metadata.submission_open_at == {"A": 44, "B": 40}
@@ -353,9 +355,9 @@ def test_t20_missing_confirmation_keeps_atomic_fallback(one_confirmed: bool) -> 
         RunConfig.for_protocol("A/VBC"),
         {
             "A": ObservedScript(
-                {29: REVISED_A, 40: SubmitJob(*A_FULL)}, confirm_from=37 if one_confirmed else None
+                {6: REVISED_A, 40: SubmitJob(*A_FULL)}, confirm_from=37 if one_confirmed else None
             ),
-            "B": ScriptedPolicy({29: PLAN_B, 40: SubmitJob(*B_STANDARD)}),
+            "B": ScriptedPolicy({6: PLAN_B, 40: SubmitJob(*B_STANDARD)}),
         },
     )
 
@@ -422,9 +424,9 @@ def test_wait_wakes_on_delivery_only_in_free_messaging(variant: str, wake_at: in
 def test_plan_tools_return_wrong_phase_outside_slots() -> None:
     env = Environment(_scenario(), RunConfig.for_protocol("A/VBC"))
     for time, action in [
-        (28, PLAN_A),
-        (30, PLAN_A),
-        (32, PLAN_A),
+        (5, PLAN_A),
+        (7, PLAN_A),
+        (13, PLAN_A),
         (34, PLAN_A),
         (36, ConfirmPlan(2)),
         (38, ConfirmPlan(2)),
@@ -437,14 +439,14 @@ def test_plan_tools_return_wrong_phase_outside_slots() -> None:
     assert not view["proposals"]
 
 
-@pytest.mark.parametrize("variant", ["A/R3P+S", "A/R3P+S+V"])
-def test_g_off_confirmation_does_not_restrict_submit_job(variant: str) -> None:
+@pytest.mark.parametrize("variant", ["A/S", "A/S+V"])
+def test_t30_g_off_records_but_does_not_restrict_off_plan_submit(variant: str) -> None:
     result = run_episode(
         _scenario(budget=13),
         RunConfig.for_protocol(variant),
         {
-            "A": ObservedScript({29: REVISED_A, 40: SubmitJob(*A_FULL)}, confirm_from=37),
-            "B": ObservedScript({29: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
+            "A": ObservedScript({6: REVISED_A, 40: SubmitJob(*A_FULL)}, confirm_from=37),
+            "B": ObservedScript({6: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
         },
     )
     assert _events(result, "agreement")[0].result == "agreed"
@@ -452,6 +454,8 @@ def test_g_off_confirmation_does_not_restrict_submit_job(variant: str) -> None:
         assert _statuses(result, agent, ConfirmPlan) == [(37, ToolStatus.OK)]
         assert _statuses(result, agent, SubmitJob) == [(40, ToolStatus.ACCEPTED)]
     assert result.spent == 13
+    off_plan = [e.agent_id for e in _events(result, "submit") if e.detail.get("off_plan")]
+    assert off_plan == ["A"]
 
 
 def test_audit_flags_an_accepted_option_outside_the_agreed_plan() -> None:
@@ -461,9 +465,9 @@ def test_audit_flags_an_accepted_option_outside_the_agreed_plan() -> None:
         RunConfig.for_protocol("A/VBC"),
         {
             "A": ObservedScript(
-                {29: ProposePlan((A_FULL,)), 40: SubmitJob(*A_FULL)}, confirm_from=37
+                {6: ProposePlan((A_FULL,)), 40: SubmitJob(*A_FULL)}, confirm_from=37
             ),
-            "B": ObservedScript({29: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
+            "B": ObservedScript({6: PLAN_B, 40: SubmitJob(*B_STANDARD)}, confirm_from=37),
         },
     )
     clean = audit_episode(result.metadata, result.log)

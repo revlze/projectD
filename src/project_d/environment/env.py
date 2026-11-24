@@ -151,6 +151,7 @@ class Environment:
         self._versions: dict[int, dict[str, dict[str, Any]]] = {}
         self._feedback: dict[int, dict[str, Any]] = {}
         self._confirmations: dict[str, int] = {}
+        # Agreed pairs per agent. Recorded with and without G; only G enforces them.
         self._agreed: dict[str, set[tuple[str, str]]] | None = None
         self._agreed_version: int | None = None
         self._schedule_phases()
@@ -205,7 +206,7 @@ class Environment:
             variant=self.variant.value,
             preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
             execution_turn_limit=min(12, self.scenario.agent_turn_limit),
-            protocol_version="baseline-phases-1",
+            protocol_version="vbc-1" if self.variant.structured else "baseline-phases-1",
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -285,11 +286,14 @@ class Environment:
             return self._refuse(agent_id, "finish", ToolStatus.FINISH_NOT_OPEN)
         if isinstance(action, SubmitJob) and self._now < self.submission_open_at[agent_id]:
             return self._submit(agent_id, action)
-        if (
-            not self.variant.structured
-            and self.phase() == "message_round"
-            and not isinstance(action, SendMessage | SkipRound)
-        ):
+        slot_actions = {
+            "message_round": SendMessage | SkipRound,
+            # Waiting in a plan slot keeps the last proposal or withholds confirmation.
+            "propose": ProposePlan | WaitUntil,
+            "confirm": ConfirmPlan | WaitUntil,
+        }
+        allowed = slot_actions.get(self.phase() or "")
+        if allowed is not None and not isinstance(action, allowed):
             return self._refuse(agent_id, "tool_call", ToolStatus.WRONG_PHASE)
         match action:
             case ListJobs():
@@ -364,13 +368,11 @@ class Environment:
             return "propose"
         if self.variant.structured and now == CONFIRM_TIME:
             return "confirm"
-        if not self.variant.structured:
-            if now >= self.config.submission_open_at:
-                return "execution"
-            if self.variant.round_times and now >= self.variant.round_times[0]:
-                return "negotiation_wait"
-            return "preparation"
-        return None
+        if now >= self.config.submission_open_at:
+            return "execution"
+        if self.variant.slot_times and now >= self.variant.slot_times[0]:
+            return "negotiation_wait"
+        return "preparation"
 
     def take_inbox(self, agent_id: str, *, mark_read: bool = True) -> tuple[dict[str, Any], ...]:
         """Show newly delivered messages in round protocols. read_messages() still returns them."""
@@ -433,6 +435,7 @@ class Environment:
                 job_id=action.job_id,
                 option_id=action.option_id,
                 cost=option.cost if option else None,
+                detail=self._plan_detail(agent_id, action.job_id, action.option_id),
             )
         else:
             assert record is not None and option is not None
@@ -493,7 +496,7 @@ class Environment:
             held_before=held_before,
             detail={
                 "commit_at": commit_at,
-                **({"plan_version": self._agreed_version} if self._agreed is not None else {}),
+                **self._plan_detail(agent_id, record.job.job_id, option.option_id),
             },
         )
         accepted = _Accepted(request_id, agent_id, record.job.job_id, option)
@@ -513,6 +516,15 @@ class Environment:
                 "completes_at": commit_at + option.duration,
             },
         )
+
+    def _plan_detail(self, agent_id: str, job_id: str, option_id: str) -> dict[str, Any]:
+        """Mark submissions against an agreed plan; G=0 records the mismatch without refusing."""
+        if self._agreed is None:
+            return {}
+        return {
+            "plan_version": self._agreed_version,
+            "off_plan": (job_id, option_id) not in self._agreed.get(agent_id, set()),
+        }
 
     def _replay(self, agent_id: str, action: SubmitJob) -> ToolResult:
         request_id = action.request_id
@@ -589,7 +601,7 @@ class Environment:
     def _read(self, agent_id: str) -> ToolResult:
         if not self.mode.messaging:
             return self._refuse(agent_id, "read_messages", ToolStatus.MESSAGING_DISABLED)
-        if not self.variant.structured and self.variant.comm is not Comm.F:
+        if self.variant.comm is not Comm.F:
             return self._refuse(agent_id, "read_messages", ToolStatus.WRONG_PHASE)
         messages = [
             {"from": m.sender, "text": m.text, "sent_at": m.sent_at}
@@ -621,7 +633,14 @@ class Environment:
             if record.job.option(option_id) is None:
                 return "unknown_option"
         item_jobs = [job_id for job_id, _ in action.items]
-        return "two_options_for_job" if len(item_jobs) != len(set(item_jobs)) else None
+        if len(item_jobs) != len(set(item_jobs)):
+            return "two_options_for_job"
+        alternatives = list(action.disclosed_alternatives)
+        if len(alternatives) != len(set(alternatives)):
+            return "duplicate_alternative"
+        if set(alternatives) & set(action.items):
+            return "chosen_option_as_alternative"
+        return None
 
     def _propose(self, agent_id: str, action: ProposePlan) -> ToolResult:
         if not self.variant.structured or self._now not in PROPOSE_TIMES:
@@ -646,7 +665,12 @@ class Environment:
     def _confirm(self, agent_id: str, plan_version: int) -> ToolResult:
         if not self.variant.structured or self._now != CONFIRM_TIME:
             return self._refuse(agent_id, "confirm_plan", ToolStatus.WRONG_PHASE)
-        if plan_version not in self._versions:
+        final = max(self._versions, default=None)
+        if (
+            plan_version != final
+            or final != len(SNAPSHOT_TIMES)
+            or set(self._versions[final]) != set(self.processing_order)
+        ):
             return self._refuse(
                 agent_id, "confirm_plan", ToolStatus.INVALID_PLAN, {"plan_version": plan_version}
             )
@@ -687,6 +711,11 @@ class Environment:
             for agent_id, proposal in proposals.items()
         }
         requested = sum(agent_totals.values())
+        missing = [agent for agent in self.processing_order if agent not in proposals]
+        if missing:
+            status = "INCOMPLETE"
+        else:
+            status = "OVER_BUDGET" if requested > self.scenario.budget else "WITHIN_BUDGET"
         savings = []
         unmet = []
         for agent_id, proposal in proposals.items():
@@ -718,6 +747,8 @@ class Environment:
             "agent_totals": agent_totals,
             "disclosed_savings": savings,
             "unmet_requires": unmet,
+            "missing_plans": missing,
+            "status": status,
         }
 
     def _resolve_agreement(self) -> None:
@@ -730,11 +761,10 @@ class Environment:
         )
         if agreed:
             self._agreed_version = final
-            if self.variant.guard:
-                self._agreed = {
-                    agent_id: {(item["job_id"], item["option_id"]) for item in proposal["items"]}
-                    for agent_id, proposal in self._versions[final].items()
-                }
+            self._agreed = {
+                agent_id: {(item["job_id"], item["option_id"]) for item in proposal["items"]}
+                for agent_id, proposal in self._versions[final].items()
+            }
         self._record(
             "agreement",
             "agreed" if agreed else "agreement_failed",

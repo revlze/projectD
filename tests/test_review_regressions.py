@@ -53,20 +53,20 @@ def dependent_scenario() -> Scenario:
 
 def agreed_run():
     a = ScriptedPolicy(
-        {29: ProposePlan((("a0", "o"),)), 37: ConfirmPlan(2), 40: SubmitJob("a0", "o")}
+        {6: ProposePlan((("a0", "o"),)), 37: ConfirmPlan(2), 40: SubmitJob("a0", "o")}
     )
     b = ScriptedPolicy(
-        {29: ProposePlan((("b0", "o"),)), 37: ConfirmPlan(2), 40: SubmitJob("b0", "o")}
+        {6: ProposePlan((("b0", "o"),)), 37: ConfirmPlan(2), 40: SubmitJob("b0", "o")}
     )
     return run_episode(dependent_scenario(), RunConfig.for_protocol("A/VBC"), {"A": a, "B": b})
 
 
 def test_feedback_does_not_reveal_undisclosed_prerequisite() -> None:
     env = Environment(dependent_scenario(), RunConfig.for_protocol("A/VBC"))
-    env.advance_to(29)
+    env.advance_to(6)
     env.execute("A", ProposePlan((("a1", "o"),)))
     env.execute("B", ProposePlan((("b0", "o"),)))
-    env.advance_to(30)
+    env.advance_to(7)
     view = env.plan_view()
     assert view["plan_feedback"]["unmet_requires"] == [{"agent_id": "A", "job_id": "a1"}]
     assert "a0" not in json.dumps(view)
@@ -74,9 +74,9 @@ def test_feedback_does_not_reveal_undisclosed_prerequisite() -> None:
 
 def test_observed_plan_cannot_change_snapshot_or_journal() -> None:
     env = Environment(dependent_scenario(), RunConfig.for_protocol("A/VBC"))
-    env.advance_to(29)
+    env.advance_to(6)
     env.execute("A", ProposePlan((("a0", "o"),)))
-    env.advance_to(30)
+    env.advance_to(7)
     view = env.plan_view()
     view["proposals"]["A"]["items"].append({"job_id": "a1", "option_id": "o", "cost": 2})
     assert len(env.plan_view()["proposals"]["A"]["items"]) == 1
@@ -185,6 +185,6 @@ def test_named_variants_default_to_new_grid(name: str) -> None:
 
 def test_malformed_plan_is_refused_without_crashing() -> None:
     env = Environment(dependent_scenario(), RunConfig.for_protocol("A/VBC"))
-    env.advance_to(29)
+    env.advance_to(6)
     result = env.execute("A", ProposePlan(None))  # type: ignore[arg-type]
     assert result.status.value == "invalid_action"

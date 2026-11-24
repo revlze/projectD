@@ -108,18 +108,22 @@ class AgreementMetrics:
     agreed_plan_completed: bool | None = None
     v_warned_agents: int | None = None
     v_warning_status: str | None = None
+    off_plan_attempts: int | None = None
+    off_plan_accepted: int | None = None
 
 
 def agreement_metrics(
     entries: Iterable[LogEntry],
     budget: int,
     shown: Iterable[tuple[str, int, dict[str, Any] | None]] = (),
+    horizon: int | None = None,
 ) -> AgreementMetrics:
     """Score the agreement from the journal and what each agent's prompt actually contained.
 
     ``shown`` holds (agent_id, logical_time, shown_plan) per LLM turn. ``v_warning_status`` is set
     only for an over-budget agreement: ``warned_and_confirmed``, ``warning_not_delivered`` or
-    ``no_v`` for variants without the V check.
+    ``no_v`` for variants without the V check. Off-plan counts cover submissions against an
+    agreed plan with and without G; completions after ``horizon`` do not count.
     """
     log = tuple(entries)
     row = next((e for e in log if e.event_type == "agreement"), None)
@@ -177,7 +181,12 @@ def agreement_metrics(
     }
     total = sum(items.values())
     over_budget = total > budget
-    finished = {(e.job_id, e.option_id) for e in log if e.event_type == "complete"}
+    finished = {
+        (e.job_id, e.option_id)
+        for e in log
+        if e.event_type == "complete" and (horizon is None or e.time <= horizon)
+    }
+    off_plan = [e for e in log if e.event_type == "submit" and e.detail.get("off_plan")]
     completed = sum(pair in finished for pair in items)
 
     status = None
@@ -201,6 +210,8 @@ def agreement_metrics(
         agreed_plan_completed=completed == len(items),
         v_warned_agents=warned_agents,
         v_warning_status=status,
+        off_plan_attempts=len(off_plan),
+        off_plan_accepted=sum(e.result == "accepted" for e in off_plan),
     )
 
 
