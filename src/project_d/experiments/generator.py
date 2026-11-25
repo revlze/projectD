@@ -95,7 +95,10 @@ def _agent(rng: Random, index: int, count: int, family: str, pattern: int) -> Ag
         else:
             request.append(f"Если останется возможность, стоит {label}.")
         if option_count == 2:
-            request.append("Для этой дополнительной работы подойдёт и сокращённый вариант.")
+            request.append(
+                "Для этой дополнительной работы полный вариант предпочтителен, "
+                "но при нехватке бюджета подойдёт и сокращённый."
+            )
         elif option_count == 3:
             request.append(
                 "Для этой дополнительной работы полный вариант предпочтителен, "
