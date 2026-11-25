@@ -447,6 +447,8 @@ def test_agreed_plan_without_its_prerequisite_is_counted() -> None:
     result = run_episode(scenario, RunConfig.for_protocol("A/S+G"), {"A": a, "B": b})
     metrics = agreement_metrics(result.log, 13, requires=result.metadata.requires)
     assert metrics.agreed and metrics.agreed_missing_prerequisites == 1
+    assert metrics.agreed_within_budget is True
+    assert metrics.agreed_dependencies_satisfied is False
 
 
 def test_structured_configurations_fail_at_construction() -> None:
@@ -671,7 +673,11 @@ def test_audit_rejects_forged_schedule_and_release_order() -> None:
         index = next(i for i, row in enumerate(result.log) if row.event_type == event)
         issues = _forged(
             result,
-            lambda rows, r, i=index, mutate=change: [*rows[:i], *mutate(rows[i], r), *rows[i + 1 :]],
+            lambda rows, r, i=index, mutate=change: [
+                *rows[:i],
+                *mutate(rows[i], r),
+                *rows[i + 1 :],
+            ],
         )
         assert any(expected in issue for issue in issues), (event, issues)
 

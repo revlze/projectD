@@ -268,8 +268,8 @@ def summarize_episode(
     conflict = root_conflict(scenario, result.metadata, result.log)
     row |= {
         "root_conflict": conflict.conflict,
-        "root_outcome": conflict.outcome,
-        "right_root_won": conflict.right_root_won,
+        "root_outcomes": conflict.outcomes,
+        "higher_value_root_completed": conflict.higher_value_root_completed,
     }
     resolved = spec.run_config(scenario).apply(scenario)
     row["primary_completed"] = {

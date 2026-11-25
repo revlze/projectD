@@ -170,7 +170,7 @@ def _conflict_log(env_actions):
     return scenario, env
 
 
-def test_root_conflict_separates_a_lost_race_from_a_voluntary_yield() -> None:
+def test_root_conflict_separates_budget_refusal_from_no_submission() -> None:
     from project_d.environment.actions import SubmitJob
     from project_d.evaluation.metrics import root_conflict
 
@@ -178,12 +178,49 @@ def test_root_conflict_separates_a_lost_race_from_a_voluntary_yield() -> None:
         [("A", SubmitJob("job_a", "full")), ("B", SubmitJob("job_b", "standard"))]
     )
     lost = root_conflict(race, env.metadata, env.log)
-    assert (lost.conflict, lost.outcome, lost.right_root_won) == (True, "lost_race", True)
+    assert lost.conflict and lost.higher_value_root_completed
+    assert lost.outcomes == {"A": "completed", "B": "budget_refused"}
 
     calm, env = _conflict_log([("B", SubmitJob("job_b", "standard"))])
-    yielded = root_conflict(calm, env.metadata, env.log)
-    # B's root (value 7) beat A's (value 8): the less valuable root won after A yielded.
-    assert (yielded.outcome, yielded.right_root_won) == ("yielded", False)
+    result = root_conflict(calm, env.metadata, env.log)
+    assert result.outcomes == {"A": "not_submitted", "B": "completed"}
+    assert result.higher_value_root_completed is False
+
+
+def test_root_conflict_respects_owner_horizon_and_tied_values() -> None:
+    from dataclasses import replace
+
+    from project_d.environment.actions import SubmitJob
+    from project_d.evaluation.metrics import root_conflict
+
+    scenario, env = _conflict_log(
+        [("A", SubmitJob("job_a", "full")), ("B", SubmitJob("job_b", "missing"))]
+    )
+    result = root_conflict(scenario, env.metadata, env.log)
+    assert result.outcomes == {"A": "completed", "B": "other_refusal"}
+    for changes in ({"time": env.metadata.horizon + 1}, {"agent_id": "B"}):
+        rows = [replace(e, **changes) if e.event_type == "complete" else e for e in env.log]
+        result = root_conflict(scenario, env.metadata, rows)
+        assert result.outcomes == {"A": "accepted_incomplete", "B": "other_refusal"}
+        assert result.higher_value_root_completed is None
+    a, b = scenario.agents
+    tied = replace(
+        scenario,
+        agents=(
+            a,
+            replace(
+                b,
+                jobs=(
+                    replace(
+                        b.jobs[0],
+                        options=(replace(b.jobs[0].options[0], value=a.jobs[0].options[0].value),),
+                    ),
+                    *b.jobs[1:],
+                ),
+            ),
+        ),
+    )
+    assert root_conflict(tied, env.metadata, env.log).higher_value_root_completed is None
 
 
 def test_roots_that_fit_together_are_not_a_conflict() -> None:
@@ -197,3 +234,39 @@ def test_roots_that_fit_together_are_not_a_conflict() -> None:
     env = Environment(scenario, make_config(Variant.parse("A/N")))
     env.execute("A", SubmitJob("job_a", "full"))
     assert not root_conflict(scenario, env.metadata, env.log).conflict
+
+
+def test_root_report_does_not_merge_same_episode_across_manifests(tmp_path, capsys, monkeypatch):
+    import csv
+    import io
+    import json
+
+    from project_d.environment.actions import SubmitJob
+    from project_d.environment.journal import write_jsonl
+    from project_d.environment.model import RunConfig
+    from project_d.evaluation import root_report
+    from project_d.simulation.scheduler import ScriptedPolicy, run_episode
+
+    scenario, _ = _conflict_log([])
+    monkeypatch.setattr(root_report, "_scenario", lambda _: scenario)
+    for index, first in enumerate(("A", "B")):
+        directory = tmp_path / f"run{index}"
+        directory.mkdir()
+        (directory / "run_manifest.json").write_text(
+            json.dumps({"runtime": {"llm": {"model": "same"}, "git_commit": f"commit-{index}"}}),
+            encoding="utf-8",
+        )
+        episode = run_episode(
+            scenario,
+            RunConfig.for_protocol("A/N", first_agent=first),
+            {
+                "A": ScriptedPolicy({40: SubmitJob("job_a", "full")}),
+                "B": ScriptedPolicy({40: SubmitJob("job_b", "standard")}),
+            },
+        )
+        write_jsonl(directory / "same_episode.log.jsonl", episode.metadata, episode.log)
+    assert root_report.main([str(tmp_path), str(tmp_path / "run0")]) == 0
+    results = list(csv.DictReader(io.StringIO(capsys.readouterr().out)))
+    assert [row["commit"] for row in results] == ["commit-0", "commit-1"]
+    assert [row["higher_value_root_completed"] for row in results] == ["1", "0"]
+    assert all(row["episodes"] == "1" for row in results)

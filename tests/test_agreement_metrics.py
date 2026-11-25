@@ -48,10 +48,10 @@ def test_variants_without_plans_have_no_agreement_metrics() -> None:
     assert agreement_metrics(result.log, 12).agreed is None
 
 
-def test_valid_agreement_and_completion() -> None:
+def test_agreed_within_budget_and_completion() -> None:
     result = scripted_run("A/VBC", cost_a=5)
     metrics = agreement_metrics(result.log, 12, shown(2, 0))
-    assert metrics.agreed and metrics.valid_agreement
+    assert metrics.agreed and metrics.agreed_within_budget
     assert not metrics.agreed_over_budget
     assert (metrics.agreed_total, metrics.agreed_overage) == (11, 0)
     assert (metrics.agreed_jobs, metrics.agreed_jobs_completed) == (2, 2)
@@ -63,7 +63,7 @@ def test_t29_over_budget_after_warning_is_a_coordination_error() -> None:
     result = scripted_run("A/VBC")
     metrics = agreement_metrics(result.log, 12, shown(2, 1))
     assert metrics.agreed and metrics.agreed_over_budget
-    assert metrics.valid_agreement is False
+    assert metrics.agreed_within_budget is False
     assert (metrics.agreed_total, metrics.agreed_overage) == (13, 1)
     assert metrics.agreed_jobs_completed == 1
     assert metrics.agreed_plan_completed is False
@@ -96,7 +96,7 @@ def test_mismatched_confirmations_are_not_an_agreement() -> None:
     metrics = agreement_metrics(scripted_run("A/VBC", b_version=1).log, 12, shown(2, 1))
     assert metrics.agreed is False
     assert metrics.agreed_over_budget is False
-    assert metrics.valid_agreement is False
+    assert metrics.agreed_within_budget is False
     assert metrics.agreed_total is None
 
 
