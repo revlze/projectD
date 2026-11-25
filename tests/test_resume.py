@@ -1,12 +1,23 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import threading
+import urllib.error
 from dataclasses import replace
+from email.message import Message
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 
-from project_d.agents.llm_client import LLMTransportError
+from project_d.agents.llm_client import (
+    ChatResponse,
+    LLMConfig,
+    LLMTransportError,
+    OpenAICompatibleClient,
+)
+from project_d.agents.providers import provider_config
 from project_d.experiments.matrix import (
     DATA_ROOT,
     EpisodeSpec,
@@ -100,6 +111,57 @@ def test_successful_resume_makes_no_requests(tmp_path):
     assert run(tmp_path, client=NoCalls()) == rows
 
 
+def _update_receipt(root: Path, suffix: str, path: Path) -> None:
+    receipt_path = root / f"{SPEC.name}.receipt.json"
+    receipt = json.loads(receipt_path.read_bytes())
+    receipt["sha256"][suffix] = file_sha256(path)
+    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+
+
+def test_resume_rejects_changed_summary_even_with_updated_checksum(tmp_path):
+    run(tmp_path)
+    path = tmp_path / f"{SPEC.name}.summary.json"
+    summary = json.loads(path.read_bytes())
+    summary["U_safe"] = 999
+    path.write_text(json.dumps(summary), encoding="utf-8")
+    _update_receipt(tmp_path, "summary.json", path)
+    with pytest.raises(ValueError, match="summary differs from the verified journals"):
+        run(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "error"),
+    (
+        ("duplicate_decision", "decisions differ by agent or time"),
+        ("tool_outcome", "incomplete request or tool outcome"),
+        ("wrong_phase", "observation differs from the decision"),
+    ),
+)
+def test_resume_rejects_inconsistent_decisions_with_updated_checksum(tmp_path, mutation, error):
+    from project_d.agents.prompts import prompt_sha256
+
+    run(tmp_path)
+    path = tmp_path / f"{SPEC.name}.llm.jsonl"
+    turns = [json.loads(line) for line in path.read_bytes().splitlines()]
+    if mutation == "duplicate_decision":
+        turns[1] = turns[0]
+    elif mutation == "tool_outcome":
+        turns[0]["tool_result"]["status"] = "accepted"
+    else:
+        request = turns[0]["request"]
+        observation = request["messages"][-1]
+        observation["content"] = observation["content"].replace(
+            "phase=preparation", "phase=confirm"
+        )
+        turns[0]["request_sha256"] = prompt_sha256(
+            json.dumps(request, ensure_ascii=False, sort_keys=True)
+        )
+    path.write_text("".join(json.dumps(turn) + "\n" for turn in turns), encoding="utf-8")
+    _update_receipt(tmp_path, "llm.jsonl", path)
+    with pytest.raises(ValueError, match=error):
+        run(tmp_path)
+
+
 def test_independent_audit_rejects_damaged_journal_even_with_updated_checksum(tmp_path):
     run(tmp_path)
     path = tmp_path / f"{SPEC.name}.log.jsonl"
@@ -108,10 +170,7 @@ def test_independent_audit_rejects_damaged_journal_even_with_updated_checksum(tm
     for index, item in enumerate(raw[1:]):
         item["seq"] = index
     path.write_bytes("".join(json.dumps(item) + "\n" for item in raw).encode("utf-8"))
-    receipt_path = tmp_path / f"{SPEC.name}.receipt.json"
-    receipt = json.loads(receipt_path.read_bytes())
-    receipt["sha256"]["log.jsonl"] = file_sha256(path)
-    receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
+    _update_receipt(tmp_path, "log.jsonl", path)
     with pytest.raises(ValueError, match="journal audit failed"):
         run(tmp_path)
 
@@ -133,6 +192,7 @@ def test_transport_failure_preserves_exact_attempt_before_retry(tmp_path):
 
     rows = run(tmp_path, client=BrokenClient())
     assert rows[0]["failure"] == "test transport interruption"
+    assert rows[0]["failure_kind"] == "transport"
     assert (tmp_path / f"{SPEC.name}.log.jsonl").exists()
     turns = [
         json.loads(line) for line in (tmp_path / f"{SPEC.name}.llm.jsonl").read_bytes().splitlines()
@@ -143,6 +203,20 @@ def test_transport_failure_preserves_exact_attempt_before_retry(tmp_path):
     archived = tmp_path / "attempts" / SPEC.name / "attempt_001"
     assert (archived / f"{SPEC.name}.log.jsonl").exists()
     assert (archived / f"{SPEC.name}.llm.jsonl").exists()
+
+
+def test_environment_failure_stops_run_and_is_not_resumed_automatically(tmp_path):
+    class BrokenClient:
+        def chat(self, messages, tools):
+            raise RuntimeError("test bench failure")
+
+    with pytest.raises(RuntimeError, match="environment failure: test bench failure"):
+        run(tmp_path, client=BrokenClient())
+    path = tmp_path / f"{SPEC.name}.summary.json"
+    assert json.loads(path.read_bytes())["failure_kind"] == "environment"
+    assert not (tmp_path / f"{SPEC.name}.receipt.json").exists()
+    with pytest.raises(ValueError, match="unresolved environment failure"):
+        run(tmp_path)
 
 
 def test_matrix_contains_only_unique_new_test_conditions():
@@ -192,3 +266,113 @@ def test_parallel_workers_match_sequential_run(tmp_path):
         for suffix in ("log.jsonl", "llm.jsonl"):
             name = f"{spec.name}.{suffix}"
             assert file_sha256(tmp_path / "par" / name) == file_sha256(tmp_path / "seq" / name)
+
+
+def test_length_is_retained_and_never_retried_on_resume(tmp_path):
+    class LengthClient(RecordingClient):
+        def chat(self, messages, tools):
+            if not self.requests:
+                super().chat(messages, tools)
+                return ChatResponse({"content": "incomplete"}, "length")
+            return super().chat(messages, tools)
+
+    rows = run(tmp_path, client=LengthClient())
+    assert (rows[0]["failure_kind"], rows[0]["length_finishes"], rows[0]["parse_errors"]) == (
+        None,
+        1,
+        1,
+    )
+
+    class NoCalls:
+        def chat(self, messages, tools):
+            pytest.fail("A completed episode with an LLM error must be reused")
+
+    assert run(tmp_path, client=NoCalls()) == rows
+
+
+def test_parallel_hosted_retry_and_resume_keep_attempts_and_started_utc(tmp_path, monkeypatch):
+    specs = [SPEC, replace(SPEC, repeat=1)]
+    first_pair = threading.Barrier(2, timeout=10)
+    attempts = {0: [], 1: []}
+    initial = True
+    secret = "test-only-api-key"
+    model = "deepseek-v4-1-flash-1017"
+    monkeypatch.setenv("MISTRAL_API_KEY", secret)
+
+    def mock_post(request, timeout):
+        payload = json.loads(request.data)
+        seed = payload["random_seed"]
+        attempts[seed].append(request.data)
+        count = len(attempts[seed])
+        assert request.get_header("Authorization") == f"Bearer {secret}"
+        headers = Message()
+        headers["x-request-id"] = f"request-{seed}-{count}"
+        if initial and count == 1:
+            first_pair.wait()
+            if seed == 0:
+                headers["Retry-After"] = "0"
+                raise urllib.error.HTTPError(request.full_url, 429, "", headers, None)
+            return BytesIO(b'{"choices":[]}')
+        if initial and seed == 0 and count == 2:
+            raise TimeoutError("mock timeout")
+        text = payload["messages"][-1]["content"]
+        logical_time = int(text.split(";", 1)[0].split("=")[1])
+        tool = "wait_until" if logical_time < 40 else "finish"
+        arguments = {"target_time": 40} if logical_time < 40 else {}
+        if "phase=message_round;" in text:
+            tool, arguments = "skip_round", {}
+        message = {"tool_calls": [{"function": {"name": tool, "arguments": json.dumps(arguments)}}]}
+        body = json.dumps(
+            {"id": f"completion-{seed}-{count}", "model": model, "choices": [{"message": message}]}
+        ).encode()
+        reply = BytesIO(body)
+        reply.headers = headers
+        return reply
+
+    monkeypatch.setattr("urllib.request.urlopen", mock_post)
+
+    def factory(seed):
+        return OpenAICompatibleClient(
+            provider_config("mistral", LLMConfig(model=model, seed=seed), retry_backoff_s=0)
+        )
+
+    def go(started, workers=2):
+        return run_specs(
+            specs,
+            ROOT,
+            tmp_path,
+            factory,
+            workers=workers,
+            run_identity={"provider": "mistral", "started_utc": started},
+        )
+
+    rows = go("2026-11-25T08:00:00+00:00")
+    assert rows[0]["failure_kind"] is None and rows[1]["failure_kind"] == "transport"
+    manifest = (tmp_path / "run_manifest.json").read_bytes()
+    assert json.loads(manifest)["workers"] == 2
+    turns = [
+        json.loads(line) for line in (tmp_path / f"{SPEC.name}.llm.jsonl").read_bytes().splitlines()
+    ]
+    trace = next(turn["http"] for turn in turns if len(turn["http"]["attempts"]) == 3)
+    assert trace["payload_sha256"] == hashlib.sha256(attempts[0][0]).hexdigest()
+    assert attempts[0][0] == attempts[0][1] == attempts[0][2]
+    assert [attempt["outcome"] for attempt in trace["attempts"]] == [
+        "rate_limited",
+        "timeout",
+        "response",
+    ]
+    assert trace["attempts"][0]["request_id"] == "request-0-1"
+    assert trace["response_id"] == "completion-0-3"
+    assert trace["response_model"] == model
+    assert secret not in json.dumps(turns)
+    before = len(attempts[0])
+    initial = False
+    resumed = go("2026-11-25T09:00:00+00:00")
+    assert resumed[0] == rows[0] and resumed[1]["failure_kind"] is None
+    assert (tmp_path / "run_manifest.json").read_bytes() == manifest
+    assert len(attempts[0]) == before
+    archived = tmp_path / "attempts" / specs[1].name / "attempt_001"
+    interrupted = json.loads((archived / f"{specs[1].name}.llm.jsonl").read_bytes())
+    assert interrupted["http"]["attempts"][0]["outcome"] == "malformed_response"
+    with pytest.raises(ValueError, match="configuration differs"):
+        go("2026-11-25T09:00:00+00:00", workers=1)

@@ -6,10 +6,13 @@ import hashlib
 import json
 import os
 import platform
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from project_d.agents.runner import TurnRecord
 from project_d.environment.journal import EpisodeMetadata, LogEntry
+from project_d.environment.model import CONFIRM_TIME, PROPOSE_TIMES, Variant
 from project_d.evaluation.audit import audit_episode
 
 
@@ -41,6 +44,15 @@ def _comparable(identity: dict[str, Any]) -> dict[str, Any]:
         return identity
     stable = {key: value for key, value in runtime.items() if key not in VOLATILE_RUNTIME_KEYS}
     return {**identity, "runtime": stable}
+
+
+@dataclass(frozen=True)
+class SavedEpisode:
+    metadata: EpisodeMetadata
+    log: list[LogEntry]
+    turns: list[TurnRecord]
+    prompt_version: str
+    summary: dict[str, Any]
 
 
 class RunStore:
@@ -77,17 +89,15 @@ class RunStore:
     def __exit__(self, *_: Any) -> None:
         self.lock.unlink()
 
-    def load(self, name: str) -> dict[str, Any] | None:
+    def load(self, name: str) -> SavedEpisode | None:
         summary_path = self.root / f"{name}.summary.json"
-        if not summary_path.exists():
-            self._archive_attempt(name)
-            return None
-        summary = json.loads(summary_path.read_bytes())
-        if summary.get("failure") is not None:
-            self._archive_attempt(name)
-            return None
         receipt_path = self.root / f"{name}.receipt.json"
         if not receipt_path.exists():
+            if (
+                summary_path.exists()
+                and json.loads(summary_path.read_bytes()).get("failure_kind") == "environment"
+            ):
+                raise ValueError(f"{name}: unresolved environment failure")
             # Interrupted between the summary and its receipt: the attempt is not trusted.
             self._archive_attempt(name)
             return None
@@ -102,6 +112,7 @@ class RunStore:
             path = self.root / f"{name}.{suffix}"
             if not path.exists() or file_sha256(path) != receipt["sha256"][suffix]:
                 raise ValueError(f"{name}: missing or modified {suffix}")
+        summary = json.loads(summary_path.read_bytes())
         raw = [
             json.loads(line) for line in (self.root / f"{name}.log.jsonl").read_bytes().splitlines()
         ]
@@ -112,33 +123,68 @@ class RunStore:
         report = audit_episode(metadata, log, require_complete=True)
         if not report.consistent:
             raise ValueError(f"{name}: journal audit failed: {report.issues}")
+        prompts = json.loads((self.root / f"{name}.prompts.json").read_bytes())
+        if prompts != {
+            "version": self.identity["prompt_version"],
+            "system_sha256": expected["system_sha256"],
+        }:
+            raise ValueError(f"{name}: prompts artifact differs from the manifest")
         turns = [
-            json.loads(line) for line in (self.root / f"{name}.llm.jsonl").read_bytes().splitlines()
+            TurnRecord(**json.loads(line))
+            for line in (self.root / f"{name}.llm.jsonl").read_bytes().splitlines()
         ]
-        if len(turns) != summary["llm_turns"] or len(turns) != sum(
-            entry.event_type == "decision" for entry in log
-        ):
-            raise ValueError(f"{name}: LLM journal and environment decision counts differ")
+        keys = {(turn.agent_id, turn.logical_time) for turn in turns}
+        if len(keys) != len(turns) or keys != report.tool_statuses.keys():
+            raise ValueError(f"{name}: LLM and environment decisions differ by agent or time")
+        variant = Variant.parse(metadata.variant)
+        opens_at = min(metadata.submission_open_at.values())
         for turn in turns:
-            request = turn.get("request")
+            request = turn.request
             # Request hashes use the same canonical text as LLMPolicy's exact snapshot.
             digest = hashlib.sha256(
                 json.dumps(request, ensure_ascii=False, sort_keys=True).encode("utf-8")
             ).hexdigest()
             if (
                 not request
-                or digest != turn.get("request_sha256")
-                or turn.get("tool_result") is None
+                or digest != turn.request_sha256
+                or turn.tool_result is None
+                or turn.tool_result.get("logical_time") != turn.logical_time
+                or turn.tool_result.get("status")
+                != report.tool_statuses[turn.agent_id, turn.logical_time]
+                or turn.transport_error is not None
             ):
                 raise ValueError(f"{name}: incomplete request or tool outcome")
+            system, user = request["messages"][:2]
             if (
-                hashlib.sha256(request["messages"][0]["content"].encode("utf-8")).hexdigest()
-                != expected["system_sha256"][turn["agent_id"]]
+                hashlib.sha256(system["content"].encode("utf-8")).hexdigest()
+                != expected["system_sha256"][turn.agent_id]
+                or hashlib.sha256(user["content"].encode("utf-8")).hexdigest()
+                != expected["user_sha256"][turn.agent_id]
             ):
-                raise ValueError(f"{name}: request system prompt differs from the manifest")
-            if fingerprint(request["tools"]) not in expected["tools_sha256"].values():
+                raise ValueError(f"{name}: request prompts differ from the manifest")
+            time = turn.logical_time
+            if time in variant.round_times:
+                phase = "message_round"
+            elif variant.structured and time in PROPOSE_TIMES:
+                phase = "propose"
+            elif variant.structured and time == CONFIRM_TIME:
+                phase = "confirm"
+            elif time < opens_at:
+                phase = "preparation"
+            elif time < metadata.submission_open_at[turn.agent_id]:
+                phase = "execution_wait"
+            else:
+                phase = "execution"
+            prefix = (
+                f"logical_time={turn.logical_time}; "
+                f"submission_open_at={metadata.submission_open_at[turn.agent_id]}; "
+                f"phase={phase}; "
+            )
+            if not request["messages"][-1]["content"].startswith(prefix):
+                raise ValueError(f"{name}: request observation differs from the decision")
+            if fingerprint(request["tools"]) != expected["tools_sha256"][phase]:
                 raise ValueError(f"{name}: request tools differ from the manifest")
-        return summary
+        return SavedEpisode(metadata, log, turns, prompts["version"], summary)
 
     def complete(self, name: str, summary: dict[str, Any]) -> None:
         write_json(self.root / f"{name}.summary.json", summary)

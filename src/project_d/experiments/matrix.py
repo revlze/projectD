@@ -18,6 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Event
 from typing import Any
 
 from project_d.agents.llm_client import (
@@ -28,10 +29,11 @@ from project_d.agents.llm_client import (
 )
 from project_d.agents.prompts import PROMPT_VERSION, build_protocol_prompt, prompt_sha256
 from project_d.agents.providers import PROVIDERS, is_local, provider_config
-from project_d.agents.runner import LLMEpisode, run_llm_episode, write_episode
+from project_d.agents.runner import LLMEpisode, TurnRecord, run_llm_episode, write_episode
 from project_d.agents.tools import tool_schemas
 from project_d.environment.actions import SubmitJob
 from project_d.environment.env import Environment
+from project_d.environment.journal import EpisodeMetadata, LogEntry
 from project_d.environment.model import (
     AgentSpec,
     Job,
@@ -175,9 +177,14 @@ def build_matrix(series: str, manifest: dict[str, Any]) -> list[EpisodeSpec]:
 
 def context_problem(episode: LLMEpisode, context_length: int | None) -> str | None:
     """Return usage warnings, not proof of truncation or a reason to discard an episode."""
+    return _context_problem(episode.turns, context_length)
+
+
+def _context_problem(turns: list[TurnRecord], context_length: int | None) -> str | None:
     by_agent: dict[str, list[int]] = {}
-    for turn in episode.turns:
-        by_agent.setdefault(turn.agent_id, []).append(turn.usage.get("prompt_tokens", 0))
+    for turn in turns:
+        if turn.usage.get("prompt_tokens") is not None:
+            by_agent.setdefault(turn.agent_id, []).append(turn.usage["prompt_tokens"])
     drops = sum(
         after < before
         for tokens in by_agent.values()
@@ -200,7 +207,34 @@ def summarize_episode(
     episode: LLMEpisode,
     context_length: int | None = None,
 ) -> dict[str, Any]:
+    result = episode.result
+    return _summarize_records(
+        spec,
+        scenario,
+        episode.turns,
+        context_length,
+        metadata=result.metadata if result else None,
+        log=result.log if result else (),
+        prompt_version=episode.prompts.get("version"),
+        failure=episode.failure,
+        failure_kind=episode.failure_kind,
+    )
+
+
+def _summarize_records(
+    spec: EpisodeSpec,
+    scenario: Scenario,
+    turns: list[TurnRecord],
+    context_length: int | None,
+    *,
+    metadata: EpisodeMetadata | None,
+    log: Iterable[LogEntry],
+    prompt_version: str | None,
+    failure: str | None = None,
+    failure_kind: str | None = None,
+) -> dict[str, Any]:
     first_agent, role_swap = REPEATS[spec.repeat]
+    traces = [turn.http for turn in turns if turn.http is not None]
     row: dict[str, Any] = {
         "episode": spec.name,
         "series": spec.series,
@@ -211,29 +245,41 @@ def summarize_episode(
         "first_agent": first_agent,
         "role_swap": role_swap,
         "start_gap": spec.start_gap,
-        "failure": episode.failure,
-        "context_warning": context_problem(episode, context_length),
+        "failure": failure,
+        "failure_kind": failure_kind,
+        "context_warning": _context_problem(turns, context_length),
         "max_prompt_tokens": max(
-            (turn.usage.get("prompt_tokens", 0) for turn in episode.turns), default=0
+            (turn.usage.get("prompt_tokens") or 0 for turn in turns), default=0
         ),
-        "llm_turns": len(episode.turns),
-        "parse_errors": sum(turn.parse_error is not None for turn in episode.turns),
-        "length_finishes": sum(turn.finish_reason == "length" for turn in episode.turns),
-        "prompt_tokens": sum(turn.usage.get("prompt_tokens", 0) for turn in episode.turns),
-        "completion_tokens": sum(turn.usage.get("completion_tokens", 0) for turn in episode.turns),
-        "llm_seconds": round(sum(turn.latency_s for turn in episode.turns), 3),
-        "prompt_version": episode.prompts.get("version"),
+        "llm_turns": len(turns),
+        "parse_errors": sum(turn.parse_error is not None for turn in turns),
+        "length_finishes": sum(turn.finish_reason == "length" for turn in turns),
+        "prompt_tokens": sum(turn.usage.get("prompt_tokens") or 0 for turn in turns),
+        "completion_tokens": sum(turn.usage.get("completion_tokens") or 0 for turn in turns),
+        "cached_prompt_tokens": sum(
+            (turn.usage.get("prompt_tokens_details") or {}).get("cached_tokens") or 0
+            for turn in turns
+        ),
+        "reasoning_tokens": sum(
+            (turn.usage.get("completion_tokens_details") or {}).get("reasoning_tokens") or 0
+            for turn in turns
+        ),
+        "http_attempts": sum(len(trace["attempts"]) for trace in traces),
+        "http_seconds": round(sum(trace["elapsed_s"] for trace in traces), 3),
+        "llm_seconds": round(sum(turn.latency_s for turn in turns), 3),
+        "prompt_version": prompt_version,
     }
-    if episode.result is None:
+    if metadata is None:
         return row
-    result = episode.result
-    metrics = episode_metrics(scenario, result.metadata, result.log)
+    log = tuple(log)
+    metrics = episode_metrics(scenario, metadata, log)
     audit = metrics.audit
     if audit.issues and row["failure"] is None:
         row["failure"] = "environment_audit_failed"
+        row["failure_kind"] = "environment"
     row |= {
-        "commit_delay": result.metadata.commit_delay,
-        "message_delay": result.metadata.message_delay,
+        "commit_delay": metadata.commit_delay,
+        "message_delay": metadata.message_delay,
         "violated": audit.violated,
         "max_overrun": audit.max_overrun,
         "U": metrics.raw_utility,
@@ -245,27 +291,27 @@ def summarize_episode(
         "unused_budget": metrics.unused_budget,
         "completion_time": metrics.completion_time,
         "messages": metrics.message_count,
-        "tool_calls": len(result.calls),
-        "rounds_missed": sum(e.event_type == "round_missed" for e in result.log),
-        "rounds_skipped": sum(e.event_type == "round_skipped" for e in result.log),
+        "tool_calls": sum(turn.tool_result is not None for turn in turns),
+        "rounds_missed": sum(e.event_type == "round_missed" for e in log),
+        "rounds_skipped": sum(e.event_type == "round_skipped" for e in log),
         "early_finish_attempts": sum(
-            e.event_type == "finish" and e.result == "finish_not_open" for e in result.log
+            e.event_type == "finish" and e.result == "finish_not_open" for e in log
         ),
         "agreement": audit.agreement,
         "plan_mismatches": audit.plan_mismatches,
         "audit_issues": len(audit.issues),
     }
-    shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in episode.turns]
+    shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in turns]
     row |= asdict(
         agreement_metrics(
-            result.log,
-            result.metadata.budget,
+            log,
+            metadata.budget,
             shown,
-            result.metadata.horizon,
-            result.metadata.requires,
+            metadata.horizon,
+            metadata.requires,
         )
     )
-    conflict = root_conflict(scenario, result.metadata, result.log)
+    conflict = root_conflict(scenario, metadata, log)
     row |= {
         "root_conflict": conflict.conflict,
         "root_outcomes": conflict.outcomes,
@@ -404,6 +450,8 @@ def run_specs(
     """Resume only identical, complete episodes; preserve failed attempts before retrying."""
     if not specs or len({spec.name for spec in specs}) != len(specs):
         raise ValueError("Episode selection must be nonempty and have unique keys")
+    if workers < 1:
+        raise ValueError("Worker count must be positive")
     manifest = load_manifest(data_root)
     verify_profiles(data_root, manifest, (spec.profile for spec in specs))
     source_root = Path(__file__).resolve().parents[1]
@@ -437,6 +485,9 @@ def run_specs(
                 )
                 for agent in resolved.agents
             },
+            "user_sha256": {
+                agent.agent_id: prompt_sha256(agent.user_request) for agent in resolved.agents
+            },
             "tools_sha256": {
                 phase: fingerprint(tool_schemas(config.variant, phase))
                 for phase in (
@@ -450,32 +501,57 @@ def run_specs(
             },
         }
     identity = {
-        "schema_version": 1,
+        "schema_version": 2,
         "runtime": run_identity,
         "source_sha256": source_hashes,
         "prompt_version": PROMPT_VERSION,
         "context_length": context_length,
+        "workers": workers,
         "episodes": identities,
         "scenario_manifest_sha256": file_sha256(data_root / "manifest.json"),
     }
     with RunStore(output_dir, identity) as store:
-        saved = {spec.name: store.load(spec.name) for spec in specs}
-        pending = [spec for spec in specs if saved[spec.name] is None]
+        halt = Event()
+        saved = {}
+        pending = []
+        for spec in specs:
+            artifact = store.load(spec.name)
+            if artifact is None:
+                pending.append(spec)
+                continue
+            row = _summarize_records(
+                spec,
+                load_scenario(data_root / spec.profile),
+                artifact.turns,
+                context_length,
+                metadata=artifact.metadata,
+                log=artifact.log,
+                prompt_version=artifact.prompt_version,
+            )
+            if fingerprint(row) != fingerprint(artifact.summary):
+                raise ValueError(f"{spec.name}: summary differs from the verified journals")
+            saved[spec.name] = row
 
         def run_one(spec: EpisodeSpec) -> dict[str, Any]:
             # Each episode writes only its own files, so episodes can run side by side.
+            if halt.is_set():
+                raise RuntimeError("Run halted after an environment failure")
             scenario = load_scenario(data_root / spec.profile)
             client = client_for_seed(base_seed + spec.repeat)
             episode = run_llm_episode(scenario, spec.run_config(scenario), client)
             write_episode(output_dir, spec.name, episode)
             row = summarize_episode(spec, scenario, episode, context_length)
             store.complete(spec.name, row)
-            print(f"[{spec.name}] {row.get('U_safe', 'failed')}", flush=True)
+            if row["failure_kind"] == "environment":
+                halt.set()
+                raise RuntimeError(f"{spec.name}: environment failure: {row['failure']}")
+            outcome = row["U_safe"] if row["failure"] is None else row["failure_kind"]
+            print(f"[{spec.name}] {outcome}", flush=True)
             return row
 
-        with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
             done = dict(zip((s.name for s in pending), pool.map(run_one, pending), strict=True))
-        rows = [saved[spec.name] or done[spec.name] for spec in specs]
+        rows = [saved[spec.name] if spec.name in saved else done[spec.name] for spec in specs]
         _write_table(output_dir / "summary.csv", rows)
     return rows
 

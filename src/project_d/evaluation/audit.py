@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 from project_d.environment.actions import ToolStatus
@@ -35,6 +35,7 @@ class AuditReport:
     issues: tuple[str, ...]
     agreement: str | None = None
     plan_mismatches: int = 0
+    tool_statuses: dict[tuple[str, int], str] = field(default_factory=dict)
 
     @property
     def consistent(self) -> bool:
@@ -96,15 +97,23 @@ _SLOT_ACTIONS = {
 
 
 class _ScheduleAudit:
-    def __init__(self, metadata: EpisodeMetadata, variant: Variant, issues: list[str]) -> None:
+    def __init__(
+        self,
+        metadata: EpisodeMetadata,
+        variant: Variant,
+        issues: list[str],
+        *,
+        scheduled: bool,
+    ) -> None:
         self.metadata = metadata
         self.variant = variant
         self.issues = issues
+        self.scheduled = scheduled
         self.opens_at = min(metadata.submission_open_at.values())
         self.agents = set(metadata.submission_open_at)
         self.finished: set[str] = set()
         self.decisions: set[tuple[str, int]] = set()
-        self.actions: set[tuple[str, int]] = set()
+        self.actions: dict[tuple[str, int], str] = {}
         self.sends: dict[int, LogEntry] = {}
         self.delivered: set[int] = set()
         self.inbox: dict[str, list[int]] = {agent: [] for agent in self.agents}
@@ -115,8 +124,7 @@ class _ScheduleAudit:
     def observe(self, entry: LogEntry, where: str) -> None:
         event, time, agent = entry.event_type, entry.time, entry.agent_id or ""
         key = (agent, time)
-        # Old journals predate decision rows and allow preparation-time finish.
-        if not self.metadata.protocol_version:
+        if not self.scheduled:
             return
         if event == "decision":
             if key in self.decisions or (self.last_action and self.last_action.time == time):
@@ -171,7 +179,7 @@ class _ScheduleAudit:
             and agent == self.metadata.first_agent
         ):
             self.issues.append(f"{where}: action order differs from the processing order")
-        self.actions.add(key)
+        self.actions[key] = "unknown_job" if result == "not_owner" else result
         self.last_action = entry
         if time in self.variant.round_times:
             slot = "round"
@@ -275,7 +283,7 @@ class _ScheduleAudit:
                 and message_id not in self.delivered
             ):
                 self.issues.append(f"message {message_id}: missing scheduled delivery")
-        if self.decisions != self.actions:
+        if self.decisions != self.actions.keys():
             self.issues.append("decisions and actions differ by agent and time")
         for time in self.variant.round_times:
             if time < self.metadata.horizon:
@@ -590,14 +598,19 @@ def audit_episode(
     accepted_jobs: set[str] = set()
     finished_jobs: set[str] = set()
     issues: list[str] = []
+    log = tuple(entries)
     plans = _PlanAudit(metadata, variant, issues, vbc1_guard_release)
-    schedule = _ScheduleAudit(metadata, variant, issues)
+    # The environment can also be driven directly, without scheduler decision limits.
+    scheduled = bool(metadata.protocol_version) and (
+        require_complete or any(entry.event_type in ("decision", "episode_end") for entry in log)
+    )
+    schedule = _ScheduleAudit(metadata, variant, issues, scheduled=scheduled)
     submissions: dict[str, LogEntry] = {}
     phase_counts = {
         agent: {"preparation": 0, "execution": 0} for agent in metadata.submission_open_at
     }
     endings = 0
-    for index, entry in enumerate(entries):
+    for index, entry in enumerate(log):
         where = f"seq {entry.seq} ({entry.event_type})"
         plans.require_pending_release(entry, where)
         schedule.observe(entry, where)
@@ -813,4 +826,5 @@ def audit_episode(
         issues=tuple(issues),
         agreement=plans.agreement,
         plan_mismatches=plan_mismatches,
+        tool_statuses=schedule.actions,
     )
