@@ -44,10 +44,10 @@ uv run python -m project_d.experiments.generator --check data/scenarios
 uv run python -m project_d.experiments.matrix E1 --dry-run
 ```
 
-Dry runs describe the complete research matrix: E1=640, E2=1232, E3=240, E4-H1=144 and E4-delay=96 new episodes. The LLM runner accepts the ten baseline variants. Structured variants require the separate VBC implementation stage and are rejected before any episode request. Select the development baseline subset with:
+Dry runs describe the complete research matrix: E1=640, E2=1232, E3=240, E4-H1=144 and E4-delay=96 new episodes. The LLM runner accepts ten baseline and six structured variants. Select the development baseline subset with:
 
 ```bash
 uv run python -m project_d.experiments.matrix E1 --baseline-only --dry-run
 ```
 
-The research entrypoint is `project_d.experiments.matrix`. Test series require `--allow-test` and the full selection. Each output directory has an immutable configuration manifest; resume checks complete artifacts and their SHA-256 receipt. Failed attempts are retained under `attempts/`. Scenario JSON uses LF on every platform. Generate data only into a scratch directory with `generator --out PATH`; the tracked sample remains fixed.
+The research entrypoint is `project_d.experiments.matrix`. Test series require `--allow-test` and the full selection. Each output directory has an immutable configuration manifest. Resume verifies SHA-256 receipts, audits complete episodes, and recomputes their summaries. Failed attempts are retained under `attempts/`. Scenario JSON uses LF on every platform. Generate data only into a scratch directory with `generator --out PATH`; the tracked sample remains fixed.
