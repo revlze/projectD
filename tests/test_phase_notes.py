@@ -12,7 +12,7 @@ from project_d.agents.prompts import (
     protocol_note,
 )
 
-PLAN = {"plan_version": 2, "proposals": {}}
+PLAN = {"plan_version": 2, "proposals": {"A": {"items": []}, "B": {"items": []}}}
 
 
 def test_round_note_directs_to_send_and_is_shared_by_round_variants() -> None:
@@ -36,6 +36,14 @@ def test_confirm_note_names_final_version_and_how_to_decline() -> None:
     assert "Окончательная версия плана: 2" in note
     assert "plan_version=2" in note
     assert "wait_until(40)" in note
+
+
+def test_incomplete_plan_cannot_be_confirmed_even_without_v_feedback() -> None:
+    for view in (None, {"plan_version": 2, "proposals": {"A": {"items": []}}}):
+        note = protocol_note("confirm", (), view, "B")
+        assert "Совместный план неполный; подтверждение недоступно" in note
+        assert "confirm_plan" not in note
+        assert "wait_until(40)" in note
 
 
 def test_notes_never_recommend_who_yields() -> None:

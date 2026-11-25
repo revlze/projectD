@@ -24,7 +24,7 @@ from project_d.environment.actions import (
 from project_d.environment.env import Environment
 from project_d.environment.model import RunConfig, Variant
 from project_d.evaluation.audit import audit_episode
-from project_d.experiments.matrix import BASELINE_VARIANTS
+from project_d.experiments.matrix import BASELINE_VARIANTS, E1_VARIANTS
 from project_d.simulation.scheduler import Observation, run_episode
 from support import make_scenario
 
@@ -68,6 +68,14 @@ class RecordingClient:
             return response("list_jobs")
         if not any("shared_budget" in item for item in results):
             return response("get_balance")
+        option = min(jobs[0]["options"], key=lambda item: item["cost"])
+        pair = {"job_id": jobs[0]["job_id"], "option_id": option["option_id"]}
+        if phase == "propose":
+            return response("propose_plan", {"items": [pair]})
+        if phase == "confirm":
+            if "подтверждение недоступно" in note:
+                return response("wait_until", {"target_time": 40})
+            return response("confirm_plan", {"plan_version": 2})
         if now < opens:
             if any(tool["function"]["name"] == "send_message" for tool in tools) and now == 2:
                 return response("send_message", {"agent_id": peer, "text": f"intent-{agent}-free"})
@@ -83,13 +91,10 @@ class RecordingClient:
             return first
         if any(item["status"] == "accepted" for item in results):
             return response("finish")
-        option = min(jobs[0]["options"], key=lambda item: item["cost"])
-        return response(
-            "submit_job", {"job_id": jobs[0]["job_id"], "option_id": option["option_id"]}
-        )
+        return response("submit_job", pair)
 
 
-@pytest.mark.parametrize("variant", BASELINE_VARIANTS)
+@pytest.mark.parametrize("variant", E1_VARIANTS)
 @pytest.mark.parametrize("delay", (1, 4, 8))
 @pytest.mark.parametrize("first,swap", product(("A", "B"), (False, True)))
 def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> None:
@@ -132,6 +137,10 @@ def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> N
         )
         payload = json.dumps(turn.request, ensure_ascii=False)
         assert "90001234" not in payload
+        other = next(
+            agent for agent in config.apply(scenario).agents if agent.agent_id != turn.agent_id
+        )
+        assert other.user_request not in payload
         assert turn.tool_result is not None
         latest = turn.request["messages"][-1]["content"]
         names = {tool["function"]["name"] for tool in turn.request["tools"]}
@@ -140,9 +149,6 @@ def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> N
         if turn.logical_time == 0:
             assert (
                 '"options"' not in latest and '"cost"' not in latest and '"requires"' not in latest
-            )
-            other = next(
-                agent for agent in config.apply(scenario).agents if agent.agent_id != turn.agent_id
             )
             assert other.jobs[0].job_id not in latest
             assert "submit_job" not in names and "finish" not in names
@@ -156,10 +162,10 @@ def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> N
         assert config.open_times(("A", "B"))[agent] in times
         assert sum(time < 40 for time in times) <= 12
         assert sum(time >= 40 for time in times) <= 12
-        if config.variant.round_times:
-            assert [time for time in times if 6 <= time < 40] == list(config.variant.round_times)
+        if config.variant.slot_times:
+            assert [time for time in times if 6 <= time < 40] == list(config.variant.slot_times)
     if config.variant.round_times:
-        for sent in [6, 13, 20][: len(config.variant.round_times)]:
+        for sent in config.variant.round_times:
             for turn in episode.turns:
                 if turn.logical_time < sent:
                     continue
@@ -170,6 +176,34 @@ def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> N
                     assert text not in payload
                 elif turn.logical_time >= sent + delay:
                     assert text in payload
+    if config.variant.structured:
+        assert next(row for row in result.log if row.event_type == "agreement").result == "agreed"
+
+
+@pytest.mark.parametrize("variant", ("A/S", "A/VBC"))
+def test_incomplete_plan_notice_appears_in_the_actual_request(variant) -> None:
+    class MissingProposal(RecordingClient):
+        def chat(self, messages, tools):
+            reply = super().chat(messages, tools)
+            if (
+                "агент B и" in messages[0]["content"]
+                and "phase=propose;" in messages[-1]["content"]
+            ):
+                return response("wait_until", {"target_time": 40})
+            return reply
+
+    episode = run_llm_episode(make_scenario(), RunConfig.for_protocol(variant), MissingProposal())
+    for turn in (turn for turn in episode.turns if turn.logical_time == 37):
+        assert (
+            "Совместный план неполный; подтверждение недоступно"
+            in (turn.request["messages"][-1]["content"])
+        )
+    result = episode.result
+    assert (
+        next(row for row in result.log if row.event_type == "agreement").result
+        == "agreement_failed"
+    )
+    assert any(row.event_type == "submit" and row.result == "accepted" for row in result.log)
 
 
 def test_explicit_skip_and_automatic_wait_still_allow_execution() -> None:

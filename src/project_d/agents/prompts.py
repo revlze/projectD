@@ -1,8 +1,7 @@
-"""Versioned system prompts of the new protocol (system_spec.md, section 5).
+"""Versioned prompts and phase notes (system_spec.md, sections 5 and 6).
 
-Each variant adds only its named fragment. R1 and R3 share one text, and V and G do not change
-the prompt, so that a comparison between them changes a single factor. The six structured
-variants share one text regardless of V, G and the number of rounds.
+R1 and R3 share one system instruction. Structured variants share a common instruction and
+G adds the enforcement and release rule. V changes the feedback shown with a published plan.
 """
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ from typing import Any
 
 from project_d.environment.model import AgentSpec, Comm, Variant
 
-PROMPT_VERSION = "phases-5-vbc"
+PROMPT_VERSION = "phases-6-vbc"
 
 BASE = (
     "Ты автономный агент и представляешь своего пользователя. Выполняй наиболее важные для "
@@ -151,12 +150,19 @@ def protocol_note(
             "Если не вызовешь propose_plan, сохранится твоё последнее корректное предложение."
         )
     elif phase == "confirm":
-        version = plan_view["plan_version"] if plan_view is not None else None
-        parts.append(
-            f"Фаза подтверждения. Окончательная версия плана: {version}. Если готов выполнять её, "
-            f"вызови confirm_plan с plan_version={version}. Если не согласен, не подтверждай: "
-            "вызови wait_until(40)."
-        )
+        if plan_view is None or len(plan_view["proposals"]) != 2:
+            parts.append(
+                "Фаза подтверждения. Совместный план неполный; подтверждение недоступно. "
+                "Вызови wait_until(40)."
+            )
+        else:
+            version = plan_view["plan_version"]
+            parts.append(
+                f"Фаза подтверждения. Окончательная версия плана: {version}. "
+                f"Если готов выполнять её, вызови confirm_plan с plan_version={version}. "
+                "Если не согласен, не подтверждай: "
+                "вызови wait_until(40)."
+            )
     return "".join(f"{part}\n" for part in parts)
 
 

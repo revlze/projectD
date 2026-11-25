@@ -527,6 +527,40 @@ def _released_episode():
     return result, a, b
 
 
+@pytest.mark.parametrize("first,off_plan_result", (("A", "plan_mismatch"), ("B", "accepted")))
+def test_guard_release_in_same_tick_respects_fixed_action_order(first, off_plan_result):
+    from dataclasses import replace
+
+    from project_d.environment.model import Job, Option
+
+    base = make_scenario()
+    a, b = base.agents
+    extra = Job("extra", (Option("run", 2, 1, 1),))
+    scenario = replace(base, agents=(replace(a, jobs=(*a.jobs, extra)), b))
+    result = run_episode(
+        scenario,
+        RunConfig.for_protocol("A/VBC", first_agent=first),
+        {
+            "A": ScriptedPolicy(
+                {
+                    6: ProposePlan((A_FULL,)),
+                    37: ConfirmPlan(2),
+                    40: SubmitJob(*A_FULL),
+                    41: SubmitJob("extra", "run"),
+                }
+            ),
+            "B": ScriptedPolicy(
+                {6: ProposePlan((B_STANDARD,)), 37: ConfirmPlan(2), 41: SubmitJob(*B_STANDARD)}
+            ),
+        },
+    )
+    by_job = {row.job_id: row.result for row in result.log if row.event_type == "submit"}
+    assert by_job == {"job_a": "accepted", "job_b": "insufficient_budget", "extra": off_plan_result}
+    assert sum(row.event_type == "plan_released" for row in result.log) == 1
+    assert result.spent == (7 if first == "A" else 9)
+    assert audit_episode(result.metadata, result.log, require_complete=True).consistent
+
+
 def test_guard_release_full_sequence_notifies_both_and_passes_audit() -> None:
     result, a, b = _released_episode()
     assert _events(result, "agreement")[0].result == "agreed"
