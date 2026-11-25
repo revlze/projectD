@@ -343,6 +343,7 @@ def test_t19_three_sequential_jobs_require_completion_and_fit_horizon() -> None:
     ]
     assert result.metadata.horizon == 80
     assert all(result.job_statuses[job] is JobStatus.COMPLETED for job, _ in chained)
+
     report = audit_episode(result.metadata, result.log)
     assert report.agreement == "agreed"
     assert report.consistent, report.issues
@@ -499,3 +500,11 @@ def test_audit_flags_acceptance_before_prerequisite_completion() -> None:
         result.metadata, [replace(e, seq=i) for i, e in enumerate(forged, start=1)]
     )
     assert any("accepted before" in issue and "job_a" in issue for issue in report.issues)
+
+
+def test_prerequisite_refusal_names_the_unfinished_own_job() -> None:
+    env = Environment(_chain_scenario(), RunConfig.for_protocol("A/N"))
+    env.advance_to(40)
+    refusal = env.execute("A", SubmitJob("final", "run"))
+    assert refusal.status is ToolStatus.PREREQUISITE_NOT_COMPLETED
+    assert refusal.data["waiting_for"] == ["followup"]

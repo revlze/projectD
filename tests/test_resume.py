@@ -54,12 +54,31 @@ def test_resume_rejects_changed_configuration_without_rewriting_manifest(
     assert (tmp_path / "run_manifest.json").read_bytes() == original
 
 
-@pytest.mark.parametrize("suffix", ("log.jsonl", "llm.jsonl", "prompts.json", "receipt.json"))
+@pytest.mark.parametrize("suffix", ("log.jsonl", "llm.jsonl", "prompts.json"))
 def test_successful_summary_with_missing_artifact_is_not_reused(tmp_path, suffix):
     run(tmp_path)
     (tmp_path / f"{SPEC.name}.{suffix}").unlink()
     with pytest.raises(ValueError, match=r"missing|incomplete"):
         run(tmp_path)
+
+
+def test_attempt_interrupted_before_its_receipt_is_archived_and_rerun(tmp_path):
+    rows = run(tmp_path)
+    (tmp_path / f"{SPEC.name}.receipt.json").unlink()
+    assert run(tmp_path) == rows
+    archived = tmp_path / "attempts" / SPEC.name / "attempt_001"
+    assert (archived / f"{SPEC.name}.summary.json").exists()
+    assert (tmp_path / f"{SPEC.name}.receipt.json").exists()
+
+
+def test_resume_ignores_when_the_run_was_first_started(tmp_path):
+    identity = {"model": "recording", "started_utc": "2026-11-25T08:00:00+00:00"}
+    run(tmp_path, identity)
+    original = (tmp_path / "run_manifest.json").read_bytes()
+    later = {**identity, "started_utc": "2026-11-25T09:30:00+00:00"}
+    run(tmp_path, later)
+    # The saved manifest keeps the first start time.
+    assert (tmp_path / "run_manifest.json").read_bytes() == original
 
 
 @pytest.mark.parametrize("suffix", ("log.jsonl", "llm.jsonl", "prompts.json", "summary.json"))

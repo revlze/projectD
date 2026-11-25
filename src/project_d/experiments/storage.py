@@ -31,6 +31,18 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+# When a run was first started is a record, not configuration: a resumed run keeps it.
+VOLATILE_RUNTIME_KEYS = ("started_utc",)
+
+
+def _comparable(identity: dict[str, Any]) -> dict[str, Any]:
+    runtime = identity.get("runtime")
+    if not isinstance(runtime, dict):
+        return identity
+    stable = {key: value for key, value in runtime.items() if key not in VOLATILE_RUNTIME_KEYS}
+    return {**identity, "runtime": stable}
+
+
 class RunStore:
     def __init__(self, root: Path, identity: dict[str, Any]) -> None:
         self.root = root
@@ -49,7 +61,7 @@ class RunStore:
         try:
             path = self.root / "run_manifest.json"
             if path.exists():
-                if json.loads(path.read_bytes()) != self.identity:
+                if _comparable(json.loads(path.read_bytes())) != _comparable(self.identity):
                     raise ValueError("Run configuration differs from the saved manifest")
             else:
                 if any(item != self.lock for item in self.root.iterdir()):
@@ -76,7 +88,9 @@ class RunStore:
             return None
         receipt_path = self.root / f"{name}.receipt.json"
         if not receipt_path.exists():
-            raise ValueError(f"{name}: incomplete episode, missing completion receipt")
+            # Interrupted between the summary and its receipt: the attempt is not trusted.
+            self._archive_attempt(name)
+            return None
         receipt = json.loads(receipt_path.read_bytes())
         expected = self.identity["episodes"][name]
         if receipt.get("identity_sha256") != fingerprint(expected):

@@ -144,7 +144,7 @@ class Environment:
         self._held = 0
         self._log: list[LogEntry] = []
         self._requests: dict[str, _Request] = {}
-        self._next_request = 0
+        self._next_request: dict[str, int] = {}
         self._next_message = 0
         self._inboxes: dict[str, list[_Message]] = {a: [] for a in agent_ids}
         self._surfaced: dict[str, set[int]] = {a: set() for a in agent_ids}
@@ -430,7 +430,7 @@ class Environment:
         if action.request_id is not None and action.request_id in self._requests:
             return self._replay(agent_id, action)
 
-        request_id = action.request_id or self._new_request_id()
+        request_id = action.request_id or self._new_request_id(agent_id)
         record = self._jobs.get(action.job_id)
         option = record.job.option(action.option_id) if record else None
         refusal = self._refusal(agent_id, record, option)
@@ -438,7 +438,17 @@ class Environment:
         if refusal is not None:
             # The journal keeps the true reason; the agent must not learn that a foreign job exists.
             visible = ToolStatus.UNKNOWN_JOB if refusal is ToolStatus.NOT_OWNER else refusal
-            result = self._result(agent_id, visible, {"request_id": request_id})
+            data: dict[str, Any] = {"request_id": request_id}
+            if refusal is ToolStatus.INSUFFICIENT_BUDGET:
+                data["shared_available"] = self.available
+            elif refusal is ToolStatus.PREREQUISITE_NOT_COMPLETED:
+                assert record is not None
+                data["waiting_for"] = [
+                    required
+                    for required in record.job.requires
+                    if self._jobs[required].status is not JobStatus.COMPLETED
+                ]
+            result = self._result(agent_id, visible, data)
             self._record(
                 "submit",
                 refusal.value,
@@ -877,10 +887,12 @@ class Environment:
         ):
             self._record("wake", "message", agent_id=message.recipient)
 
-    def _new_request_id(self) -> str:
+    def _new_request_id(self, agent_id: str) -> str:
+        # Per-agent numbering: a shared counter would reveal how often the partner submitted.
         while True:
-            request_id = f"r{self._next_request}"
-            self._next_request += 1
+            number = self._next_request.get(agent_id, 0)
+            self._next_request[agent_id] = number + 1
+            request_id = f"{agent_id}-r{number}"
             if request_id not in self._requests:
                 return request_id
 

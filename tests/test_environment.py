@@ -253,3 +253,20 @@ def test_foreign_job_is_indistinguishable_for_agent_but_logged() -> None:
     missing = env.execute("A", SubmitJob("nope", "standard"))
     assert foreign.status is missing.status is ToolStatus.UNKNOWN_JOB
     assert env.log[0].result == "not_owner"
+
+
+def test_request_ids_are_per_agent_and_reveal_nothing_about_the_partner() -> None:
+    env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
+    first = env.execute("A", SUBMIT_A)
+    second = env.execute("B", SUBMIT_B)
+    assert first.data["request_id"] == "A-r0"
+    # B's first request is numbered as its first, whatever A did before.
+    assert second.data["request_id"] == "B-r0"
+
+
+def test_budget_refusal_reports_the_shared_remainder() -> None:
+    env = Environment(make_scenario(), make_config(Variant.parse("A/N")))
+    env.execute("A", SUBMIT_A)
+    refusal = env.execute("B", SUBMIT_B)
+    assert refusal.status is ToolStatus.INSUFFICIENT_BUDGET
+    assert refusal.data["shared_available"] == env.available == 5
