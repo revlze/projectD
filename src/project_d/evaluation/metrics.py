@@ -111,6 +111,11 @@ class AgreementMetrics:
     off_plan_attempts: int | None = None
     off_plan_accepted: int | None = None
     agreed_missing_prerequisites: int | None = None
+    # G released after a budget refusal of an agreed submission (decisions.md, 25.11.2026).
+    plan_released: bool | None = None
+    plan_released_at: int | None = None
+    off_plan_before_release: int | None = None
+    off_plan_after_release: int | None = None
 
 
 def agreement_metrics(
@@ -189,6 +194,8 @@ def agreement_metrics(
         if e.event_type == "complete" and (horizon is None or e.time <= horizon)
     }
     off_plan = [e for e in log if e.event_type == "submit" and e.detail.get("off_plan")]
+    release = next((e for e in log if e.event_type == "plan_released"), None)
+    after = [e for e in off_plan if release is not None and e.seq > release.seq]
     chosen = {
         agent: {item["job_id"] for item in proposal["items"]}
         for agent, proposal in versions[version].items()
@@ -224,6 +231,10 @@ def agreement_metrics(
         off_plan_attempts=len(off_plan),
         off_plan_accepted=sum(e.result == "accepted" for e in off_plan),
         agreed_missing_prerequisites=missing_prerequisites,
+        plan_released=release is not None,
+        plan_released_at=release.time if release is not None else None,
+        off_plan_before_release=len(off_plan) - len(after),
+        off_plan_after_release=len(after),
     )
 
 

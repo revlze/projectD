@@ -51,7 +51,7 @@ def _plan_block(
     return lines
 
 
-def _check_block(feedback: dict[str, Any]) -> list[str]:
+def _check_block(feedback: dict[str, Any], viewer: str, other: str) -> list[str]:
     budget, requested = feedback["budget"], feedback["requested_total"]
     if feedback["status"] == "INCOMPLETE":
         missing = ", ".join(feedback["missing_plans"])
@@ -59,8 +59,11 @@ def _check_block(feedback: dict[str, Any]) -> list[str]:
             f"- Бюджет: {budget}; запрошено по переданным планам: {requested}",
             f"- INCOMPLETE: нет плана агента {missing}",
         ]
+    # The same line for both agents (T34): totals are named by agent, not "yours"/"theirs".
+    totals = feedback["agent_totals"]
+    split = ", ".join(f"план {agent}: {totals.get(agent, 0)}" for agent in sorted((viewer, other)))
     return [
-        f"- Бюджет: {budget}; запрошено: {requested}; превышение: {feedback['overage']}",
+        f"- Бюджет: {budget}; запрошено: {requested} ({split}); превышение: {feedback['overage']}",
         f"- {feedback['status']}",
     ]
 
@@ -74,7 +77,7 @@ def render_plan(view: dict[str, Any], viewer: str, other: str) -> str:
     lines += _plan_block(other, proposals.get(other), feedback)
     if feedback is not None:
         lines.append("ПРОВЕРКА БЮДЖЕТА")
-        lines += _check_block(feedback)
+        lines += _check_block(feedback, viewer, other)
     notes = [
         (agent, proposals[agent]["note"])
         for agent in (viewer, other)

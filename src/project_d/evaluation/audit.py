@@ -7,6 +7,7 @@ is checked against the catalog and the timing rules stored in the episode metada
 
 from __future__ import annotations
 
+import json
 from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
@@ -77,6 +78,7 @@ class _PlanAudit:
         self.agreed_items: dict[str, set[tuple[str, str]]] | None = None
         self.feedback_versions: list[int] = []
         self.released = False
+        self.pending_release: LogEntry | None = None
 
     def propose(self, entry: LogEntry, where: str) -> None:
         if entry.time not in PROPOSE_TIMES:
@@ -119,14 +121,51 @@ class _PlanAudit:
             status = "INCOMPLETE"
         else:
             status = "OVER_BUDGET" if requested > self.metadata.budget else "WITHIN_BUDGET"
+        savings = []
+        unmet = []
+        for agent_id, proposal in proposals.items():
+            chosen = {item["job_id"]: item for item in proposal["items"]}
+            for alternative in proposal["disclosed_alternatives"]:
+                item = chosen.get(alternative["job_id"])
+                if item is not None and alternative["cost"] < item["cost"]:
+                    savings.append(
+                        {
+                            "agent_id": agent_id,
+                            "job_id": alternative["job_id"],
+                            "option_id": alternative["option_id"],
+                            "saving": item["cost"] - alternative["cost"],
+                        }
+                    )
+            # V runs before submission opens, so no prerequisite can have completed yet.
+            unmet += [
+                {"agent_id": agent_id, "job_id": job_id}
+                for job_id in chosen
+                if any(r not in chosen for r in self.metadata.requires.get(job_id, ()))
+            ]
         rebuilt = {
+            "plan_version": version,
+            "budget": self.metadata.budget,
             "requested_total": requested,
             "overage": max(requested - self.metadata.budget, 0),
+            "agent_totals": {
+                agent: sum(item["cost"] for item in p["items"]) for agent, p in proposals.items()
+            },
+            "disclosed_savings": savings,
+            "unmet_requires": unmet,
+            "missing_plans": missing,
             "status": status,
         }
-        if {key: entry.detail.get(key) for key in rebuilt} != rebuilt or sorted(
-            entry.detail.get("missing_plans", ())
-        ) != missing:
+
+        def canonical(value: dict[str, Any]) -> str:
+            return json.dumps(
+                {
+                    k: sorted(map(json.dumps, v)) if isinstance(v, list) else v
+                    for k, v in value.items()
+                },
+                sort_keys=True,
+            )
+
+        if canonical(dict(entry.detail)) != canonical(rebuilt):
             self.issues.append(f"{where}: V feedback differs from the rebuilt version")
 
     def check_off_plan(self, entry: LogEntry, where: str) -> None:
@@ -195,6 +234,39 @@ class _PlanAudit:
         ):
             self.issues.append(f"{where}: agreement row differs from rebuilt agreement")
 
+    def expect_release(self, refusal: LogEntry) -> None:
+        """Under G, a budget refusal of a pair in the agreed plan must release the plan."""
+        version = self.agreed_version()
+        if not self.variant.guard or version is None or self.released:
+            return
+        items = self.versions[version][refusal.agent_id or ""]["items"]
+        if (refusal.job_id, refusal.option_id) in {(i["job_id"], i["option_id"]) for i in items}:
+            self.pending_release = refusal
+
+    @property
+    def release_required(self) -> bool:
+        # The release rule of G (decisions.md, 25.11.2026) came within vbc-1: older vbc-1
+        # journals have no releases, later ones do. From vbc-2 on a release is mandatory.
+        return self.metadata.protocol_version != "vbc-1"
+
+    def require_pending_release(self, entry: LogEntry, where: str) -> None:
+        if self.pending_release is not None and entry.event_type != "plan_released":
+            if self.release_required:
+                self.issues.append(f"{where}: agreed plan was not released after a budget refusal")
+            self.pending_release = None
+
+    def release(self, entry: LogEntry, where: str) -> None:
+        cause = self.pending_release
+        if (
+            cause is None
+            or entry.agent_id != cause.agent_id
+            or entry.seq != cause.seq + 1
+            or entry.time != cause.time
+        ):
+            self.issues.append(f"{where}: plan released without a budget refusal of the plan")
+        self.pending_release = None
+        self.released = True
+
     def check_guard(self, entry: LogEntry, where: str) -> None:
         if not self.variant.guard or entry.time < self.opens_at or self.released:
             return
@@ -206,6 +278,8 @@ class _PlanAudit:
             self.issues.append(f"{where}: {entry.job_id}/{entry.option_id} outside agreed plan")
 
     def finish(self) -> None:
+        if self.pending_release is not None and self.release_required:
+            self.issues.append("agreed plan was not released after a budget refusal")
         if not self.variant.structured:
             return
         if len(self.versions) != len(SNAPSHOT_TIMES):
@@ -244,6 +318,7 @@ def audit_episode(
 
     for index, entry in enumerate(entries):
         where = f"seq {entry.seq} ({entry.event_type})"
+        plans.require_pending_release(entry, where)
         if entry.seq != index:
             issues.append(f"{where}: journal sequence is incomplete")
         if entry.scenario_id != metadata.scenario_id or entry.mode != metadata.mode:
@@ -341,8 +416,14 @@ def audit_episode(
         elif entry.event_type == "submit" and entry.result == "plan_mismatch":
             plan_mismatches += 1
 
+        elif entry.event_type == "submit" and entry.result == "insufficient_budget":
+            headroom = budget - spent - (held if reserving else 0)
+            if entry.cost is None or entry.cost <= headroom:
+                issues.append(f"{where}: budget refusal although the cost fits the remainder")
+            plans.expect_release(entry)
+
         elif entry.event_type == "plan_released":
-            plans.released = True
+            plans.release(entry, where)
 
         elif entry.event_type == "commit":
             source = accepted.get(request_id or "")

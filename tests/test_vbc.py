@@ -14,6 +14,7 @@ from project_d.agents.prompts import build_protocol_prompt, prompt_sha256
 from project_d.agents.runner import run_llm_episode
 from project_d.environment.actions import (
     ConfirmPlan,
+    GetStatus,
     ProposePlan,
     SendMessage,
     SubmitJob,
@@ -28,6 +29,7 @@ from project_d.environment.model import (
     load_scenario,
 )
 from project_d.evaluation.audit import audit_episode
+from project_d.evaluation.metrics import agreement_metrics
 from project_d.experiments.matrix import BASELINE_VARIANTS, DATA_ROOT
 from project_d.simulation.scheduler import Observation, ScriptedPolicy, run_episode
 from support import make_scenario
@@ -85,10 +87,13 @@ def test_t26_phase_grid_simultaneous_proposals_and_visible_versions(
     rounds = Variant.parse(variant).round_times
     probes = {t: SendMessage("B", "early") for t in (0, 5)}
     sends = {t: SendMessage("B", f"round {t}") for t in rounds}
-    a = Watcher(
-        {**probes, **sends, 6: ProposePlan((A_FULL,), (A_SHORT,)), 33: ProposePlan((A_SHORT,))}
-    )
-    b = Watcher({6: ProposePlan((B_STANDARD,))})
+    # After a role swap agent A owns job_b and B owns job_a: each proposes its own jobs.
+    full, short, standard = A_FULL, A_SHORT, B_STANDARD
+    first_plan = ProposePlan((standard,)) if role_swap else ProposePlan((full,), (short,))
+    revised = ProposePlan((standard,)) if role_swap else ProposePlan((short,))
+    other_plan = ProposePlan((full,), (short,)) if role_swap else ProposePlan((standard,))
+    a = Watcher({**probes, **sends, 6: first_plan, 33: revised})
+    b = Watcher({6: other_plan})
     result = run_episode(
         _scenario(),
         RunConfig.for_protocol(variant, first_agent=first_agent, role_swap=role_swap),
@@ -110,6 +115,13 @@ def test_t26_phase_grid_simultaneous_proposals_and_visible_versions(
         assert watcher.seen[37].plan_view["plan_version"] == 2
     assert [e.time for e in _events(result, "plan_version")] == list(SNAPSHOT_TIMES)
     assert {e.time for e in _events(result, "propose_plan")} <= set(PROPOSE_TIMES)
+    # Every proposal is valid, so both versions are complete plans of both agents.
+    assert all(e.result == "ok" for e in _events(result, "propose_plan"))
+    for version in _events(result, "plan_version"):
+        assert set(version.detail["proposals"]) == {"A", "B"}
+        assert all(p["items"] for p in version.detail["proposals"].values())
+    if Variant.parse(variant).verify:
+        assert all(e.detail["status"] != "INCOMPLETE" for e in _events(result, "plan_feedback"))
     sent = [e.time for e in _events(result, "send_message") if e.result == "ok"]
     assert sent == list(rounds)
     assert audit_episode(result.metadata, result.log).consistent
@@ -197,7 +209,7 @@ def test_t34_same_facts_for_both_agents() -> None:
         "- job_a/full: 7 кредитов",
         "- Альтернатива job_a/short: 4 кредита (экономия 3)",
     ]
-    assert "- Бюджет: 12; запрошено: 13; превышение: 1" in text_a
+    assert "- Бюджет: 12; запрошено: 13 (план A: 7, план B: 6); превышение: 1" in text_a
     assert "- OVER_BUDGET" in text_a
     assert "- A: главное - полный вариант" in text_a
 
@@ -289,7 +301,7 @@ BASELINE_RUN = Path(__file__).parents[1] / "results/e1-baseline-bc00219"
 OLD_ENDING = "при недостатке бюджета допустим отказ."
 NEW_ENDING = (
     "при недостатке бюджета можно самому отказаться от работы. Среда не решает, кто должен "
-    "уступить: отказ заявки означает лишь, что общий бюджет уже занят."
+    "уступить: отказ insufficient_budget означает лишь, что общий бюджет уже занят."
 )
 
 
@@ -307,6 +319,7 @@ def test_baseline_prompts_changed_only_in_the_base_ending(monkeypatch) -> None:
     from project_d.agents import prompts
 
     monkeypatch.setattr(prompts, "BASE", prompts.BASE.replace(NEW_ENDING, OLD_ENDING))
+    # NEW_ENDING already carries the later insufficient_budget wording, so one swap suffices.
     manifest = json.loads((BASELINE_RUN / "mistral-small-2603/run_manifest.json").read_bytes())
     for identity in manifest["episodes"].values():
         spec = identity["spec"]
@@ -490,3 +503,97 @@ def test_guard_releases_after_an_agreed_submission_is_refused_for_budget() -> No
     assert refused.status is ToolStatus.INSUFFICIENT_BUDGET
     assert refused.data["plan_released"] is True
     assert any(e.event_type == "plan_released" for e in env.log)
+
+
+def _released_episode():
+    """A/VBC, budget 12: plans 7 + 6 confirmed over budget; B's planned job is refused."""
+    scenario = make_scenario(budget=12, b_options=(("standard", 6), ("lite", 3)))
+    a = Watcher(
+        {6: ProposePlan((A_FULL,)), 37: ConfirmPlan(2), 40: SubmitJob(*A_FULL), 41: GetStatus()}
+    )
+    b = Watcher(
+        {
+            6: ProposePlan((B_STANDARD,)),
+            37: ConfirmPlan(2),
+            40: SubmitJob(*B_STANDARD),
+            41: SubmitJob("job_b", "lite"),
+        }
+    )
+    result = run_episode(
+        scenario, RunConfig.for_protocol("A/VBC", first_agent="A"), {"A": a, "B": b}
+    )
+    return result, a, b
+
+
+def test_guard_release_full_sequence_notifies_both_and_passes_audit() -> None:
+    result, a, b = _released_episode()
+    assert _events(result, "agreement")[0].result == "agreed"
+    statuses = [
+        (c.time, c.agent_id, c.result.status)
+        for c in result.calls
+        if isinstance(c.action, SubmitJob)
+    ]
+    assert statuses == [
+        (40, "A", ToolStatus.ACCEPTED),
+        (40, "B", ToolStatus.INSUFFICIENT_BUDGET),
+        # Off the agreed plan, accepted only because G was released.
+        (41, "B", ToolStatus.ACCEPTED),
+    ]
+    assert len(_events(result, "plan_released")) == 1
+    for watcher in (a, b):
+        assert any(n.startswith("AGREED: ") for n in watcher.seen[40].protocol_notices)
+        assert any(n.startswith("PLAN_RELEASED: ") for n in watcher.seen[41].protocol_notices)
+    assert audit_episode(result.metadata, result.log).consistent
+    metrics = agreement_metrics(result.log, 12)
+    assert (
+        metrics.plan_released,
+        metrics.off_plan_before_release,
+        metrics.off_plan_after_release,
+    ) == (True, 0, 1)
+
+
+def _forged(result, change):
+    from dataclasses import replace as _replace
+
+    log = list(result.log)
+    log = change(log, _replace)
+    return audit_episode(result.metadata, [_replace(e, seq=i) for i, e in enumerate(log)]).issues
+
+
+def test_audit_rejects_forged_missing_or_repeated_release() -> None:
+    result, _, _ = _released_episode()
+    index = next(i for i, e in enumerate(result.log) if e.event_type == "plan_released")
+    release = result.log[index]
+    assert any(
+        "without a budget refusal" in issue
+        for issue in _forged(
+            result, lambda log, r: [*log[:index], r(release, agent_id="NOBODY"), *log[index + 1 :]]
+        )
+    )
+    assert any(
+        "not released" in issue
+        for issue in _forged(result, lambda log, r: [*log[:index], *log[index + 1 :]])
+    )
+    assert any(
+        "without a budget refusal" in issue
+        for issue in _forged(result, lambda log, r: [*log[: index + 1], release, *log[index + 1 :]])
+    )
+
+
+def test_audit_rebuilds_every_field_of_v() -> None:
+    result, _, _ = _released_episode()
+    index = next(i for i, e in enumerate(result.log) if e.event_type == "plan_feedback")
+    row = result.log[index]
+    for field, value in (
+        ("budget", 999),
+        ("agent_totals", {"A": 999, "B": 6}),
+        (
+            "disclosed_savings",
+            [{"agent_id": "A", "job_id": "job_a", "option_id": "short", "saving": 999}],
+        ),
+    ):
+        forged = {**row.detail, field: value}
+        issues = _forged(
+            result, lambda log, r, f=forged: [*log[:index], r(row, detail=f), *log[index + 1 :]]
+        )
+        assert any("V feedback differs" in issue for issue in issues), field

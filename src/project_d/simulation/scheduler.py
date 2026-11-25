@@ -30,6 +30,7 @@ class Observation:
     execution_turns_remaining: int = 0
     phase_started: bool = False
     horizon: int = 80
+    protocol_notices: tuple[str, ...] = ()
 
 
 class Policy(Protocol):
@@ -177,6 +178,7 @@ def run_episode(
                 execution_turns_remaining=execution_limit - turns[agent_id]["execution"],
                 phase_started=previous_phases[agent_id] != phase,
                 horizon=env.scenario.horizon,
+                protocol_notices=env.take_notices(agent_id),
             )
         decisions = {}
         for agent_id in ready:

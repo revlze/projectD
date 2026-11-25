@@ -110,6 +110,11 @@ def _well_formed(action: Any) -> bool:
             return False
 
 
+PLAN_RELEASED_NOTICE = (
+    "PLAN_RELEASED: ограничение согласованного плана снято из-за отказа по бюджету."
+)
+
+
 class Environment:
     def __init__(self, scenario: Scenario, config: RunConfig) -> None:
         self.scenario = config.apply(scenario)
@@ -160,6 +165,8 @@ class Environment:
         self._confirmations: dict[str, int] = {}
         # G stops binding once an agreed submission is refused for lack of budget.
         self._plan_released = False
+        # Protocol state shown at each agent's next decision (agreement, release of G).
+        self._notices: dict[str, list[str]] = {agent: [] for agent in self.processing_order}
         # Agreed pairs per agent. Recorded with and without G; only G enforces them.
         self._agreed: dict[str, set[tuple[str, str]]] | None = None
         self._agreed_version: int | None = None
@@ -215,7 +222,7 @@ class Environment:
             variant=self.variant.value,
             preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
             execution_turn_limit=min(12, self.scenario.agent_turn_limit),
-            protocol_version="vbc-1" if self.variant.structured else "baseline-phases-1",
+            protocol_version="vbc-2" if self.variant.structured else "baseline-phases-1",
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -472,6 +479,8 @@ class Environment:
             )
             if data.get("plan_released"):
                 self._record("plan_released", ToolStatus.OK.value, agent_id=agent_id)
+                for agent in self.processing_order:
+                    self._notices[agent].append(PLAN_RELEASED_NOTICE)
         else:
             assert record is not None and option is not None
             result = self._accept(agent_id, request_id, record, option)
@@ -817,6 +826,18 @@ class Environment:
                 "fallback": not agreed and self.variant.guard,
             },
         )
+        if agreed:
+            notice = f"AGREED: оба агента подтвердили версию #{final}."  # noqa: RUF001
+            if self.variant.guard:
+                notice += " С открытия подачи среда принимает только заявки из этого плана."  # noqa: RUF001
+        else:
+            notice = "AGREEMENT_FAILED: общий план не подтверждён."
+        for agent in self.processing_order:
+            self._notices[agent].append(notice)
+
+    def take_notices(self, agent_id: str) -> tuple[str, ...]:
+        notices, self._notices[agent_id] = self._notices[agent_id], []
+        return tuple(notices)
 
     def _wait(self, agent_id: str, target: int) -> ToolResult:
         if not self._now < target <= self.scenario.horizon:

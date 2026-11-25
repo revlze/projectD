@@ -104,6 +104,8 @@ class LLMPolicy:
         )
         if phase in ("execution", "execution_wait") and observation.phase_started:
             note += "Началось окно исполнения. Показаны фактические статусы собственных работ.\n"
+        for notice in observation.protocol_notices:
+            note += f"{notice}\n"
         window = (
             "открыта" if observation.logical_time >= observation.submission_open_at else "закрыта"
         )
