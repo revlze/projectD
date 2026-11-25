@@ -580,6 +580,102 @@ def test_audit_rejects_forged_missing_or_repeated_release() -> None:
     )
 
 
+def test_audit_rebuilds_refusal_cause_before_allowing_release() -> None:
+    from dataclasses import replace
+
+    from project_d.environment.model import Job, Option
+
+    base = make_scenario()
+    agent, peer = base.agents
+    child = Job("child", (Option("run", 2, 1, 1),), requires=("job_a",))
+    scenario = replace(base, agents=(replace(agent, jobs=(*agent.jobs, child)), peer))
+    result = run_episode(
+        scenario,
+        RunConfig.for_protocol("A/VBC"),
+        {
+            "A": ScriptedPolicy(
+                {
+                    6: ProposePlan((("child", "run"),)),
+                    37: ConfirmPlan(2),
+                    40: SubmitJob("child", "run"),
+                }
+            ),
+            "B": ScriptedPolicy({6: ProposePlan(()), 37: ConfirmPlan(2)}),
+        },
+    )
+    assert audit_episode(result.metadata, result.log, require_complete=True).consistent
+    refusal = next(e for e in result.log if e.event_type == "submit")
+    assert refusal.result == "prerequisite_not_completed"
+
+    def forge(rows, update):
+        index = rows.index(refusal)
+        corrupt = update(refusal, result="insufficient_budget", cost=999)
+        release = update(
+            refusal,
+            event_type="plan_released",
+            result="ok",
+            request_id=None,
+            job_id=None,
+            option_id=None,
+            cost=None,
+            detail={},
+        )
+        return [*rows[:index], corrupt, release, *rows[index + 1 :]]
+
+    issues = _forged(result, forge)
+    assert any("cost differs from the catalog" in issue for issue in issues)
+    assert any("rebuilt prerequisite_not_completed" in issue for issue in issues)
+    assert any("released without a budget refusal" in issue for issue in issues)
+
+
+@pytest.mark.parametrize(
+    ("event", "changes", "expected"),
+    [
+        ("commit", {"cost": 999}, "commit differs"),
+        ("commit", {"request_id": "other"}, "commit without accepted"),
+        ("complete", {"agent_id": "other"}, "completion differs"),
+        ("complete", {"time": 79}, "completed at the wrong time"),
+        ("confirm_plan", {"detail": {"plan_version": 1}}, "invalid confirmation"),
+        (
+            "plan_released",
+            {"result": "wrong", "detail": {"cause": "wrong_phase"}},
+            "released without",
+        ),
+    ],
+)
+def test_audit_detects_mutated_vbc_transitions(event, changes, expected) -> None:
+    result, _, _ = _released_episode()
+    index = next(i for i, e in enumerate(result.log) if e.event_type == event)
+    issues = _forged(
+        result, lambda log, r: [*log[:index], r(log[index], **changes), *log[index + 1 :]]
+    )
+    assert any(expected in issue for issue in issues)
+
+
+def test_audit_rejects_forged_schedule_and_release_order() -> None:
+    result, _, _ = _released_episode()
+    for event, change, expected in (
+        ("propose_plan", lambda row, _: [row, row], "repeated action"),
+        (
+            "episode_end",
+            lambda row, update: [update(row, event_type="get_status", agent_id="A"), row],
+            "action after finish",
+        ),
+        ("plan_released", lambda row, _: [], "outside agreed plan"),
+        (
+            "plan_released",
+            lambda row, update: [update(row, time=row.time - 1), row],
+            "released without",
+        ),
+    ):
+        index = next(i for i, row in enumerate(result.log) if row.event_type == event)
+        issues = _forged(
+            result,
+            lambda rows, r, i=index, mutate=change: [*rows[:i], *mutate(rows[i], r), *rows[i + 1 :]],
+        )
+        assert any(expected in issue for issue in issues), (event, issues)
+
+
 def test_audit_rebuilds_every_field_of_v() -> None:
     result, _, _ = _released_episode()
     index = next(i for i, e in enumerate(result.log) if e.event_type == "plan_feedback")

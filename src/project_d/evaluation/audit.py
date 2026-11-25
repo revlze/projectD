@@ -12,12 +12,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any
 
+from project_d.environment.actions import ToolStatus
 from project_d.environment.journal import EpisodeMetadata, LogEntry
 from project_d.environment.model import (
     CONFIRM_TIME,
     FEEDBACK_TIMES,
     PROPOSE_TIMES,
     SNAPSHOT_TIMES,
+    Comm,
     Variant,
 )
 
@@ -53,6 +55,14 @@ def _same_operation(source: LogEntry, entry: LogEntry) -> bool:
     )
 
 
+def _same_submission(first: LogEntry, second: LogEntry) -> bool:
+    return (first.agent_id, first.job_id, first.option_id) == (
+        second.agent_id,
+        second.job_id,
+        second.option_id,
+    )
+
+
 def _plan_item_issue(metadata: EpisodeMetadata, agent_id: str, item: dict[str, Any]) -> bool:
     job = metadata.catalog.get(item.get("job_id", ""))
     if job is None or job["owner"] != agent_id:
@@ -61,10 +71,236 @@ def _plan_item_issue(metadata: EpisodeMetadata, agent_id: str, item: dict[str, A
     return option is None or option["cost"] != item.get("cost")
 
 
+_ACTIONS = {
+    "confirm_plan",
+    "finish",
+    "get_balance",
+    "get_status",
+    "invalid_action",
+    "list_jobs",
+    "propose_plan",
+    "read_messages",
+    "round_skipped",
+    "send_message",
+    "skip_round",
+    "submit",
+    "submit_replayed",
+    "tool_call",
+    "wait_until",
+}
+_SLOT_ACTIONS = {
+    "round": {"send_message", "round_skipped", "skip_round"},
+    "proposal": {"propose_plan", "wait_until"},
+    "confirmation": {"confirm_plan", "wait_until"},
+}
+
+
+class _ScheduleAudit:
+    def __init__(self, metadata: EpisodeMetadata, variant: Variant, issues: list[str]) -> None:
+        self.metadata = metadata
+        self.variant = variant
+        self.issues = issues
+        self.opens_at = min(metadata.submission_open_at.values())
+        self.agents = set(metadata.submission_open_at)
+        self.finished: set[str] = set()
+        self.decisions: set[tuple[str, int]] = set()
+        self.actions: set[tuple[str, int]] = set()
+        self.sends: dict[int, LogEntry] = {}
+        self.delivered: set[int] = set()
+        self.inbox: dict[str, list[int]] = {agent: [] for agent in self.agents}
+        self.round_participation: set[tuple[str, int]] = set()
+        self.round_misses: set[tuple[str, int]] = set()
+        self.last_action: LogEntry | None = None
+
+    def observe(self, entry: LogEntry, where: str) -> None:
+        event, time, agent = entry.event_type, entry.time, entry.agent_id or ""
+        key = (agent, time)
+        # Old journals predate decision rows and allow preparation-time finish.
+        if not self.metadata.protocol_version:
+            return
+        if event == "decision":
+            if key in self.decisions or (self.last_action and self.last_action.time == time):
+                self.issues.append(f"{where}: repeated or late decision in the same tick")
+            self.decisions.add(key)
+            if agent in self.finished or not self._decision_window(time):
+                self.issues.append(f"{where}: decision outside its phase or after finish")
+            if self.variant.round_times and self.inbox.get(agent):
+                self.issues.append(f"{where}: delivered messages not shown at decision")
+        elif event in _ACTIONS:
+            if agent not in self.agents:
+                self.issues.append(f"{where}: unknown action owner")
+                return
+            self._action(entry, where, key)
+        elif event == "message_delivered":
+            self._deliver(entry, where)
+        elif event == "message_read":
+            self._read(entry, where)
+        elif event == "round_missed":
+            missed = (agent, entry.detail.get("round_time"))
+            if (
+                time - 1 not in self.variant.round_times
+                or missed != (agent, time - 1)
+                or agent not in self.agents
+                or missed in self.round_misses | self.round_participation
+                or entry.result != "ok"
+            ):
+                self.issues.append(f"{where}: incorrect missed round")
+            self.round_misses.add(missed)
+        elif event in {"agreement", "plan_version", "plan_feedback", "complete"} or (
+            event == "commit" and self.metadata.commit_delay > 0
+        ):
+            if any((peer, time) in self.decisions for peer in self.agents):
+                self.issues.append(f"{where}: scheduled event occurs after a decision in its tick")
+
+    def _decision_window(self, time: int) -> bool:
+        slots = self.variant.slot_times
+        return time < self.metadata.horizon and (
+            not slots or time < slots[0] or time in slots or time >= self.opens_at
+        )
+
+    def _action(self, entry: LogEntry, where: str, key: tuple[str, int]) -> None:
+        agent, time = key
+        event, result = entry.event_type, entry.result
+        if key in self.actions or agent in self.finished or not self._decision_window(time):
+            self.issues.append(
+                f"{where}: repeated action, action after finish or outside its phase"
+            )
+        if (
+            self.last_action is not None
+            and self.last_action.time == time
+            and agent == self.metadata.first_agent
+        ):
+            self.issues.append(f"{where}: action order differs from the processing order")
+        self.actions.add(key)
+        self.last_action = entry
+        if time in self.variant.round_times:
+            slot = "round"
+        elif self.variant.structured and time in PROPOSE_TIMES:
+            slot = "proposal"
+        elif self.variant.structured and time == CONFIRM_TIME:
+            slot = "confirmation"
+        else:
+            slot = None
+        early = time < self.metadata.submission_open_at[agent]
+        # Wrongly typed calls and early finish/submit attempts have explicit refusal rows.
+        exceptional = (
+            event in ("invalid_action", "tool_call")
+            or (early and event in ("submit", "submit_replayed"))
+            or (early and event == "finish" and result == "finish_not_open")
+        )
+        if slot and event not in _SLOT_ACTIONS[slot] and not exceptional:
+            self.issues.append(f"{where}: action is not allowed in the {slot} slot")
+        if event == "finish" and result != ("finish_not_open" if early else "ok"):
+            self.issues.append(f"{where}: finish result differs from the individual opening")
+        if event == "finish" and result == "ok":
+            self.finished.add(agent)
+        if result != "ok":
+            return
+        if event == "send_message":
+            self._send(entry, where)
+        elif event == "read_messages":
+            self._read(entry, where)
+        elif event == "round_skipped":
+            if slot != "round":
+                self.issues.append(f"{where}: skip outside a message round")
+            self.round_participation.add(key)
+        elif event in ("propose_plan", "confirm_plan") and not slot:
+            self.issues.append(f"{where}: successful plan action outside its slot")
+
+    def _send(self, entry: LogEntry, where: str) -> None:
+        message_id = entry.detail.get("message_id")
+        recipient = entry.detail.get("to")
+        expected_delay = max(1, self.metadata.message_delay)
+        rounds = self.variant.round_times
+        if (
+            not self.variant.messaging
+            or entry.time >= self.opens_at
+            or recipient not in self.agents - {entry.agent_id}
+            or not isinstance(message_id, int)
+            or message_id in self.sends
+            or entry.detail.get("deliver_at") != entry.time + expected_delay
+            or (
+                rounds
+                and (
+                    entry.time not in rounds
+                    or entry.detail.get("round") != rounds.index(entry.time) + 1
+                )
+            )
+        ):
+            self.issues.append(f"{where}: invalid message send or delivery schedule")
+            return
+        self.sends[message_id] = entry
+        if rounds:
+            self.round_participation.add((entry.agent_id or "", entry.time))
+
+    def _deliver(self, entry: LogEntry, where: str) -> None:
+        message_id = entry.detail.get("message_id")
+        sent = self.sends.get(message_id)
+        agent = entry.agent_id or ""
+        if (
+            sent is None
+            or sent.detail["deliver_at"] != entry.time
+            or sent.detail["to"] != agent
+            or entry.detail.get("from") != sent.agent_id
+            or message_id in self.delivered
+            or entry.result != "ok"
+            or any((peer, entry.time) in self.decisions for peer in self.agents)
+        ):
+            self.issues.append(
+                f"{where}: delivery differs from sent message or arrives after a decision"
+            )
+            return
+        self.delivered.add(message_id)
+        self.inbox[agent].append(message_id)
+
+    def _read(self, entry: LogEntry, where: str) -> None:
+        agent = entry.agent_id or ""
+        automatic = entry.event_type == "message_read"
+        inbox = self.inbox.get(agent)
+        if (
+            not (self.variant.round_times if automatic else self.variant.comm is Comm.F)
+            or inbox is None
+            or entry.result != "ok"
+            or entry.detail.get("message_ids") != inbox
+            or (automatic and (not inbox or (agent, entry.time) in self.decisions))
+        ):
+            self.issues.append(f"{where}: message shown before delivery or to the wrong owner")
+            return
+        inbox.clear()
+
+    def finish(self) -> None:
+        for message_id, sent in self.sends.items():
+            if (
+                sent.detail["deliver_at"] <= self.metadata.horizon
+                and message_id not in self.delivered
+            ):
+                self.issues.append(f"message {message_id}: missing scheduled delivery")
+        if self.decisions != self.actions:
+            self.issues.append("decisions and actions differ by agent and time")
+        for time in self.variant.round_times:
+            if time < self.metadata.horizon:
+                for agent in self.agents:
+                    if (agent, time) not in self.round_participation | self.round_misses:
+                        self.issues.append(f"{agent} at {time}: missing round outcome")
+        slots = self.variant.slot_times
+        if self.metadata.preparation_turn_limit >= len(slots):
+            for time in slots:
+                if time < self.metadata.horizon:
+                    for agent in self.agents:
+                        if (agent, time) not in self.decisions:
+                            self.issues.append(f"{agent} at {time}: missing scheduled decision")
+
+
 class _PlanAudit:
     """Rebuilds plan versions and the agreement from proposal and confirmation rows."""
 
-    def __init__(self, metadata: EpisodeMetadata, variant: Variant, issues: list[str]) -> None:
+    def __init__(
+        self,
+        metadata: EpisodeMetadata,
+        variant: Variant,
+        issues: list[str],
+        vbc1_guard_release: bool | None,
+    ) -> None:
         self.metadata = metadata
         self.variant = variant
         self.issues = issues
@@ -79,6 +315,7 @@ class _PlanAudit:
         self.feedback_versions: list[int] = []
         self.released = False
         self.pending_release: LogEntry | None = None
+        self.vbc1_guard_release = vbc1_guard_release
 
     def propose(self, entry: LogEntry, where: str) -> None:
         if entry.time not in PROPOSE_TIMES:
@@ -236,18 +473,20 @@ class _PlanAudit:
 
     def expect_release(self, refusal: LogEntry) -> None:
         """Under G, a budget refusal of a pair in the agreed plan must release the plan."""
-        version = self.agreed_version()
-        if not self.variant.guard or version is None or self.released:
-            return
-        items = self.versions[version][refusal.agent_id or ""]["items"]
-        if (refusal.job_id, refusal.option_id) in {(i["job_id"], i["option_id"]) for i in items}:
+        if (
+            self.variant.guard
+            and self.agreed_items is not None
+            and not self.released
+            and (refusal.job_id, refusal.option_id)
+            in self.agreed_items.get(refusal.agent_id or "", ())
+        ):
             self.pending_release = refusal
 
     @property
     def release_required(self) -> bool:
         # The release rule of G (decisions.md, 25.11.2026) came within vbc-1: older vbc-1
         # journals have no releases, later ones do. From vbc-2 on a release is mandatory.
-        return self.metadata.protocol_version != "vbc-1"
+        return self.metadata.protocol_version != "vbc-1" or self.vbc1_guard_release is True
 
     def require_pending_release(self, entry: LogEntry, where: str) -> None:
         if self.pending_release is not None and entry.event_type != "plan_released":
@@ -259,23 +498,29 @@ class _PlanAudit:
         cause = self.pending_release
         if (
             cause is None
+            or (self.metadata.protocol_version == "vbc-1" and self.vbc1_guard_release is False)
             or entry.agent_id != cause.agent_id
             or entry.seq != cause.seq + 1
             or entry.time != cause.time
+            or entry.result != "ok"
+            or entry.detail
+            or any(
+                v is not None for v in (entry.request_id, entry.job_id, entry.option_id, entry.cost)
+            )
         ):
             self.issues.append(f"{where}: plan released without a budget refusal of the plan")
+        else:
+            self.released = True
         self.pending_release = None
-        self.released = True
 
-    def check_guard(self, entry: LogEntry, where: str) -> None:
-        if not self.variant.guard or entry.time < self.opens_at or self.released:
-            return
-        version = self.agreed_version()
-        if version is None:
-            return
-        items = self.versions[version][entry.agent_id or ""]["items"]
-        if (entry.job_id, entry.option_id) not in {(i["job_id"], i["option_id"]) for i in items}:
-            self.issues.append(f"{where}: {entry.job_id}/{entry.option_id} outside agreed plan")
+    def guard_blocks(self, entry: LogEntry) -> bool:
+        return (
+            self.variant.guard
+            and self.agreed_items is not None
+            and not self.released
+            and (entry.job_id, entry.option_id)
+            not in self.agreed_items.get(entry.agent_id or "", ())
+        )
 
     def finish(self) -> None:
         if self.pending_release is not None and self.release_required:
@@ -292,9 +537,46 @@ class _PlanAudit:
             )
 
 
+def _submission_result(
+    entry: LogEntry,
+    metadata: EpisodeMetadata,
+    plans: _PlanAudit,
+    accepted_jobs: set[str],
+    finished_jobs: set[str],
+    headroom: int,
+) -> ToolStatus:
+    job_id = entry.job_id or ""
+    job = metadata.catalog.get(job_id)
+    if job is None:
+        return ToolStatus.UNKNOWN_JOB
+    if job["owner"] != entry.agent_id:
+        return ToolStatus.NOT_OWNER
+    option = _catalog_option(metadata, entry)
+    if option is None:
+        return ToolStatus.UNKNOWN_OPTION
+    if plans.guard_blocks(entry):
+        return ToolStatus.PLAN_MISMATCH
+    if job_id in accepted_jobs:
+        return ToolStatus.JOB_ALREADY_ACCEPTED
+    if entry.time < metadata.submission_open_at[job["owner"]]:
+        return ToolStatus.SUBMISSION_NOT_OPEN
+    if not finished_jobs.issuperset(metadata.requires.get(job_id, ())):
+        return ToolStatus.PREREQUISITE_NOT_COMPLETED
+    if entry.time + metadata.commit_delay + option["duration"] > metadata.horizon:
+        return ToolStatus.TOO_LATE
+    if option["cost"] > headroom:
+        return ToolStatus.INSUFFICIENT_BUDGET
+    return ToolStatus.ACCEPTED
+
+
 def audit_episode(
-    metadata: EpisodeMetadata, entries: Iterable[LogEntry], *, require_complete: bool = False
+    metadata: EpisodeMetadata,
+    entries: Iterable[LogEntry],
+    *,
+    require_complete: bool = False,
+    vbc1_guard_release: bool | None = None,
 ) -> AuditReport:
+    """Check current journals or declare the guard rule of a known vbc-1 cohort."""
     # Historical journals remain readable; these aliases are not executable protocols.
     historical = {"B0": "U/N", "B1": "U/F", "B2": "A/N", "B3": "A/F"}
     name = metadata.variant or metadata.mode
@@ -308,17 +590,17 @@ def audit_episode(
     accepted_jobs: set[str] = set()
     finished_jobs: set[str] = set()
     issues: list[str] = []
-    plans = _PlanAudit(metadata, variant, issues)
+    plans = _PlanAudit(metadata, variant, issues, vbc1_guard_release)
+    schedule = _ScheduleAudit(metadata, variant, issues)
+    submissions: dict[str, LogEntry] = {}
     phase_counts = {
         agent: {"preparation": 0, "execution": 0} for agent in metadata.submission_open_at
     }
     endings = 0
-    sends: dict[int, LogEntry] = {}
-    delivered: dict[int, str] = {}
-
     for index, entry in enumerate(entries):
         where = f"seq {entry.seq} ({entry.event_type})"
         plans.require_pending_release(entry, where)
+        schedule.observe(entry, where)
         if entry.seq != index:
             issues.append(f"{where}: journal sequence is incomplete")
         if entry.scenario_id != metadata.scenario_id or entry.mode != metadata.mode:
@@ -347,41 +629,65 @@ def audit_episode(
                     issues.append(f"{where}: invalid phase decision budget")
         elif entry.event_type == "episode_end":
             endings += 1
-            if entry.time != metadata.horizon or entry.detail.get("turns") != phase_counts:
-                issues.append(f"{where}: invalid episode completion record")
-        elif metadata.protocol_version and entry.event_type == "finish" and entry.result == "ok":
-            if entry.time < metadata.submission_open_at.get(entry.agent_id or "", 0):
-                issues.append(f"{where}: finished before individual opening")
-        elif entry.event_type == "send_message" and entry.result == "ok":
-            message_id = entry.detail["message_id"]
-            sends[message_id] = entry
-            if entry.detail["deliver_at"] != entry.time + max(1, metadata.message_delay):
-                issues.append(f"{where}: incorrect delivery time")
-        elif entry.event_type == "message_delivered":
-            message_id = entry.detail["message_id"]
-            sent = sends.get(message_id)
             if (
-                sent is None
-                or sent.detail["deliver_at"] != entry.time
-                or sent.detail["to"] != entry.agent_id
+                entry.time != metadata.horizon
+                or entry.result != "complete"
+                or entry.detail.get("turns") != phase_counts
             ):
-                issues.append(f"{where}: delivery differs from sent message")
-            if message_id in delivered:
-                issues.append(f"{where}: message delivered twice")
-            delivered[message_id] = entry.agent_id or ""
-        elif entry.event_type in ("message_read", "read_messages") and entry.result == "ok":
-            if any(
-                delivered.get(item) != entry.agent_id
-                for item in entry.detail.get("message_ids", ())
-            ):
-                issues.append(f"{where}: message shown before delivery or to the wrong owner")
+                issues.append(f"{where}: invalid episode completion record")
+        if endings and entry.event_type != "episode_end":
+            issues.append(f"{where}: event after episode completion")
         request_id = entry.request_id
         if entry.time < last_time:
             issues.append(f"{where}: time moved backwards")
         last_time = max(last_time, entry.time)
 
-        if entry.event_type == "submit":
-            plans.check_off_plan(entry, where)
+        verified_result = None
+        if entry.event_type in ("submit", "submit_replayed"):
+            prior = submissions.get(request_id or "")
+            if entry.event_type == "submit_replayed":
+                visible = (
+                    "unknown_job"
+                    if prior is not None and prior.result == "not_owner"
+                    else prior.result
+                    if prior is not None
+                    else None
+                )
+                if prior is None or not _same_submission(prior, entry) or entry.result != visible:
+                    issues.append(f"{where}: replay differs from the original submission")
+            elif prior is not None or entry.result == "request_id_conflict":
+                if (
+                    prior is None
+                    or _same_submission(prior, entry)
+                    or entry.result != "request_id_conflict"
+                    or entry.cost is not None
+                ):
+                    issues.append(f"{where}: incorrect request-id conflict")
+            else:
+                if request_id is None:
+                    issues.append(f"{where}: missing submission request id")
+                else:
+                    submissions[request_id] = entry
+                if metadata.catalog and metadata.protocol_version:
+                    option = _catalog_option(metadata, entry)
+                    expected_cost = option["cost"] if option is not None else None
+                    if entry.cost != expected_cost:
+                        issues.append(f"{where}: cost differs from the catalog")
+                    headroom = budget - spent - (held if reserving else 0)
+                    verified_result = _submission_result(
+                        entry, metadata, plans, accepted_jobs, finished_jobs, headroom
+                    )
+                    if entry.result != verified_result:
+                        if verified_result is ToolStatus.PLAN_MISMATCH:
+                            issues.append(
+                                f"{where}: {entry.job_id}/{entry.option_id} outside agreed plan"
+                            )
+                        issues.append(
+                            f"{where}: submission result {entry.result} differs from "
+                            f"rebuilt {verified_result.value}"
+                        )
+            if entry.event_type == "submit" and entry.result != "request_id_conflict":
+                plans.check_off_plan(entry, where)
         if entry.event_type == "submit" and entry.result == "accepted":
             if entry.job_id in accepted_jobs:
                 issues.append(f"{where}: job {entry.job_id} accepted twice")
@@ -409,7 +715,6 @@ def audit_episode(
             headroom = budget - spent - (held if reserving else 0)
             if headroom < (entry.cost or 0):
                 issues.append(f"{where}: accepted without sufficient budget")
-            plans.check_guard(entry, where)
             if reserving:
                 held += entry.cost or 0
 
@@ -420,7 +725,8 @@ def audit_episode(
             headroom = budget - spent - (held if reserving else 0)
             if entry.cost is None or entry.cost <= headroom:
                 issues.append(f"{where}: budget refusal although the cost fits the remainder")
-            plans.expect_release(entry)
+            if verified_result is ToolStatus.INSUFFICIENT_BUDGET:
+                plans.expect_release(entry)
 
         elif entry.event_type == "plan_released":
             plans.release(entry, where)
@@ -492,6 +798,8 @@ def audit_episode(
         for r in sorted(set(committed) - set(completed))
     )
     plans.finish()
+    if (require_complete or endings) and metadata.protocol_version:
+        schedule.finish()
     if require_complete and endings != 1:
         issues.append(f"expected one episode completion record, found {endings}")
 

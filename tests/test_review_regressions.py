@@ -61,6 +61,20 @@ def agreed_run():
     return run_episode(dependent_scenario(), RunConfig.for_protocol("A/VBC"), {"A": a, "B": b})
 
 
+def test_audit_requires_delivery_even_when_a_free_message_is_never_read() -> None:
+    result = run_episode(
+        make_scenario(),
+        RunConfig.for_protocol("A/F"),
+        {"A": ScriptedPolicy({0: SendMessage("B", "unread")}), "B": ScriptedPolicy()},
+    )
+    assert audit_episode(result.metadata, result.log, require_complete=True).consistent
+    rows = [e for e in result.log if e.event_type != "message_delivered"]
+    audit = audit_episode(
+        result.metadata, [replace(e, seq=i) for i, e in enumerate(rows)], require_complete=True
+    )
+    assert any("missing scheduled delivery" in issue for issue in audit.issues)
+
+
 def test_feedback_does_not_reveal_undisclosed_prerequisite() -> None:
     env = Environment(dependent_scenario(), RunConfig.for_protocol("A/VBC"))
     env.advance_to(6)
