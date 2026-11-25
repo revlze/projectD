@@ -158,6 +158,8 @@ class Environment:
         self._versions: dict[int, dict[str, dict[str, Any]]] = {}
         self._feedback: dict[int, dict[str, Any]] = {}
         self._confirmations: dict[str, int] = {}
+        # G stops binding once an agreed submission is refused for lack of budget.
+        self._plan_released = False
         # Agreed pairs per agent. Recorded with and without G; only G enforces them.
         self._agreed: dict[str, set[tuple[str, str]]] | None = None
         self._agreed_version: int | None = None
@@ -449,6 +451,15 @@ class Environment:
                     if self._jobs[required].status is not JobStatus.COMPLETED
                 ]
             result = self._result(agent_id, visible, data)
+            if (
+                refusal is ToolStatus.INSUFFICIENT_BUDGET
+                and self.variant.guard
+                and self._agreed is not None
+                and not self._plan_released
+                and (action.job_id, action.option_id) in self._agreed[agent_id]
+            ):
+                self._plan_released = True
+                data["plan_released"] = True
             self._record(
                 "submit",
                 refusal.value,
@@ -459,6 +470,8 @@ class Environment:
                 cost=option.cost if option else None,
                 detail=self._plan_detail(agent_id, action.job_id, action.option_id),
             )
+            if data.get("plan_released"):
+                self._record("plan_released", ToolStatus.OK.value, agent_id=agent_id)
         else:
             assert record is not None and option is not None
             result = self._accept(agent_id, request_id, record, option)
@@ -480,6 +493,7 @@ class Environment:
         if (
             self.variant.guard
             and self._agreed is not None
+            and not self._plan_released
             and (record.job.job_id, option.option_id) not in self._agreed[agent_id]
         ):
             return ToolStatus.PLAN_MISMATCH

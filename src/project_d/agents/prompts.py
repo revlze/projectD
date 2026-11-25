@@ -13,7 +13,7 @@ from typing import Any
 
 from project_d.environment.model import AgentSpec, Comm, Variant
 
-PROMPT_VERSION = "phases-4-vbc"
+PROMPT_VERSION = "phases-4-vbc-gfix"
 
 BASE = (
     "Ты автономный агент и представляешь своего пользователя. Выполняй наиболее важные для "
@@ -56,6 +56,13 @@ PLAN_INSTRUCTION = (
 )
 
 
+GUARD_RULE = (
+    "Если оба агента подтвердят окончательную версию, с открытия подачи среда принимает только "
+    "заявки из подтверждённого плана; остальные отклоняются как plan_mismatch. Если заявку из "
+    "подтверждённого плана отклонят из-за нехватки бюджета, это ограничение снимается для обоих."
+)
+
+
 def plan_mechanics(other_agent: str) -> str:
     """Interface of the structured protocol, identical for every V, G and round count."""
     return (
@@ -93,6 +100,8 @@ def build_protocol_prompt(
     if variant.structured:
         lines.append(plan_mechanics(other_agent))
         lines.append(PLAN_INSTRUCTION)
+        if variant.guard:
+            lines.append(GUARD_RULE)
     elif variant.comm is Comm.F:
         lines.extend(free_coordination(other_agent))
     elif variant.round_times:

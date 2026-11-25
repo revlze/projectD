@@ -270,7 +270,13 @@ def test_vbc_runs_through_the_llm_loop_and_records_shown_plans() -> None:
 
 def test_structured_prompt_is_shared_by_v_g_and_round_count() -> None:
     agent = make_scenario().agents[0]
-    prompts = {build_protocol_prompt(agent, "B", Variant.parse(v), 40) for v in STRUCTURED}
+    from project_d.agents.prompts import GUARD_RULE
+
+    # Experiment: G variants add one sentence that states the guard rule.
+    prompts = {
+        build_protocol_prompt(agent, "B", Variant.parse(v), 40).replace("\n" + GUARD_RULE, "")
+        for v in STRUCTURED
+    }
     assert len(prompts) == 1
     (prompt,) = prompts
     assert "раунд" in prompt and "R3P" not in prompt
@@ -469,3 +475,18 @@ def test_t29_and_t34_warning_reaches_the_request_with_its_logged_hash() -> None:
         assert text in turn.request["messages"][-1]["content"]
         assert prompt_sha256(text) == turn.shown_plan["text_sha256"]
         assert "OVER_BUDGET" in text
+
+
+def test_guard_releases_after_an_agreed_submission_is_refused_for_budget() -> None:
+    from project_d.environment.env import Environment
+    from project_d.environment.model import RunConfig
+    from support import make_scenario
+
+    env = Environment(make_scenario(budget=12), RunConfig.for_protocol("A/VBC"))
+    env._agreed = {"A": {("job_a", "full")}, "B": {("job_b", "standard")}}
+    env._spent = 8
+    env._now = 40
+    refused = env.execute("B", SubmitJob("job_b", "standard"))
+    assert refused.status is ToolStatus.INSUFFICIENT_BUDGET
+    assert refused.data["plan_released"] is True
+    assert any(e.event_type == "plan_released" for e in env.log)

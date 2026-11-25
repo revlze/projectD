@@ -76,6 +76,7 @@ class _PlanAudit:
         self.agreement: str | None = None
         self.agreed_items: dict[str, set[tuple[str, str]]] | None = None
         self.feedback_versions: list[int] = []
+        self.released = False
 
     def propose(self, entry: LogEntry, where: str) -> None:
         if entry.time not in PROPOSE_TIMES:
@@ -195,7 +196,7 @@ class _PlanAudit:
             self.issues.append(f"{where}: agreement row differs from rebuilt agreement")
 
     def check_guard(self, entry: LogEntry, where: str) -> None:
-        if not self.variant.guard or entry.time < self.opens_at:
+        if not self.variant.guard or entry.time < self.opens_at or self.released:
             return
         version = self.agreed_version()
         if version is None:
@@ -339,6 +340,9 @@ def audit_episode(
 
         elif entry.event_type == "submit" and entry.result == "plan_mismatch":
             plan_mismatches += 1
+
+        elif entry.event_type == "plan_released":
+            plans.released = True
 
         elif entry.event_type == "commit":
             source = accepted.get(request_id or "")
