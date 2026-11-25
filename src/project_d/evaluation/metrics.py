@@ -286,3 +286,53 @@ def episode_metrics(
         ),
         audit=audit,
     )
+
+
+@dataclass(frozen=True)
+class RootConflict:
+    """How a conflict between the two root jobs was resolved (experiments.md, section 4).
+
+    ``conflict`` holds when the cheapest options of both roots exceed the budget together, so
+    at most one root can run. ``outcome`` says what happened to the root that did not
+    complete: ``yielded`` (its owner never submitted it), ``lost_race`` (refused for budget),
+    ``other`` (submitted and refused for another reason, or accepted but not completed),
+    ``none_lost`` (both roots completed) or ``both_lost``. ``right_root_won`` is True when the
+    root of higher hidden value completed, None when the values tie or no root completed.
+    """
+
+    conflict: bool
+    outcome: str | None = None
+    right_root_won: bool | None = None
+
+
+def root_conflict(
+    scenario: Scenario, metadata: EpisodeMetadata, entries: Iterable[LogEntry]
+) -> RootConflict:
+    resolved = scenario.with_role_swap() if metadata.role_swap else scenario
+    roots = {agent.agent_id: agent.jobs[0] for agent in resolved.agents}
+    cheapest = sum(min(option.cost for option in job.options) for job in roots.values())
+    if cheapest <= metadata.budget:
+        return RootConflict(False)
+    log = tuple(entries)
+    completed = {e.job_id for e in log if e.event_type == "complete"}
+    done = [owner for owner, job in roots.items() if job.job_id in completed]
+    if len(done) == len(roots):
+        return RootConflict(True, "none_lost")
+    if not done:
+        return RootConflict(True, "both_lost")
+    (loser,) = (owner for owner in roots if owner not in done)
+    results = [
+        e.result
+        for e in log
+        if e.event_type == "submit" and e.agent_id == loser and e.job_id == roots[loser].job_id
+    ]
+    if not results:
+        outcome = "yielded"
+    elif ToolStatus.INSUFFICIENT_BUDGET.value in results:
+        outcome = "lost_race"
+    else:
+        outcome = "other"
+    value = {owner: max(o.value for o in job.options) for owner, job in roots.items()}
+    winner = done[0]
+    right = None if value[winner] == value[loser] else value[winner] > value[loser]
+    return RootConflict(True, outcome, right)

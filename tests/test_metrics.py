@@ -155,3 +155,45 @@ def test_empty_episode_and_role_swap_with_asymmetric_opening() -> None:
     scored = episode_metrics(scenario, result.metadata, result.log)
     assert scored.optimal_utility == 0
     assert scored.safe_fraction is None
+
+
+def _conflict_log(env_actions):
+    from project_d.environment.env import Environment
+    from project_d.environment.model import Variant
+    from support import make_config, make_scenario
+
+    scenario = make_scenario(budget=12, a_options=(("full", 7),), b_options=(("standard", 6),))
+    env = Environment(scenario, make_config(Variant.parse("A/N")))
+    for agent, action in env_actions:
+        env.execute(agent, action)
+    env.advance_to(scenario.horizon)
+    return scenario, env
+
+
+def test_root_conflict_separates_a_lost_race_from_a_voluntary_yield() -> None:
+    from project_d.environment.actions import SubmitJob
+    from project_d.evaluation.metrics import root_conflict
+
+    race, env = _conflict_log(
+        [("A", SubmitJob("job_a", "full")), ("B", SubmitJob("job_b", "standard"))]
+    )
+    lost = root_conflict(race, env.metadata, env.log)
+    assert (lost.conflict, lost.outcome, lost.right_root_won) == (True, "lost_race", True)
+
+    calm, env = _conflict_log([("B", SubmitJob("job_b", "standard"))])
+    yielded = root_conflict(calm, env.metadata, env.log)
+    # B's root (value 7) beat A's (value 8): the less valuable root won after A yielded.
+    assert (yielded.outcome, yielded.right_root_won) == ("yielded", False)
+
+
+def test_roots_that_fit_together_are_not_a_conflict() -> None:
+    from project_d.environment.actions import SubmitJob
+    from project_d.environment.env import Environment
+    from project_d.environment.model import Variant
+    from project_d.evaluation.metrics import root_conflict
+    from support import make_config, make_scenario
+
+    scenario = make_scenario(budget=13)
+    env = Environment(scenario, make_config(Variant.parse("A/N")))
+    env.execute("A", SubmitJob("job_a", "full"))
+    assert not root_conflict(scenario, env.metadata, env.log).conflict

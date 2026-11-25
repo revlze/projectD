@@ -41,7 +41,7 @@ from project_d.environment.model import (
     load_scenario,
 )
 from project_d.evaluation.audit import audit_episode
-from project_d.evaluation.metrics import agreement_metrics, episode_metrics
+from project_d.evaluation.metrics import agreement_metrics, episode_metrics, root_conflict
 from project_d.experiments.generator import validate_dataset
 from project_d.experiments.storage import RunStore, file_sha256, fingerprint
 from project_d.simulation.scheduler import ScriptedPolicy, run_episode
@@ -265,6 +265,12 @@ def summarize_episode(
             result.metadata.requires,
         )
     )
+    conflict = root_conflict(scenario, result.metadata, result.log)
+    row |= {
+        "root_conflict": conflict.conflict,
+        "root_outcome": conflict.outcome,
+        "right_root_won": conflict.right_root_won,
+    }
     resolved = spec.run_config(scenario).apply(scenario)
     row["primary_completed"] = {
         agent.agent_id: {
