@@ -44,6 +44,7 @@ class TurnRecord:
     request_sha256: str = ""
     tool_result: dict[str, Any] | None = None
     transport_error: str | None = None
+    http: dict[str, Any] | None = None
 
 
 class LLMPolicy:
@@ -147,6 +148,7 @@ class LLMPolicy:
                     request=request,
                     request_sha256=digest,
                     transport_error=str(exc),
+                    http=asdict(exc.trace) if exc.trace is not None else None,
                 )
             )
             raise
@@ -202,6 +204,7 @@ class LLMPolicy:
                 shown_plan=shown_plan,
                 request=request,
                 request_sha256=digest,
+                http=asdict(response.http) if response.http is not None else None,
             )
         )
         return action
@@ -224,6 +227,7 @@ class LLMEpisode:
     turns: list[TurnRecord] = field(default_factory=list)
     failure: str | None = None
     prompts: dict[str, Any] = field(default_factory=dict)
+    failure_kind: str | None = None
 
 
 def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -> LLMEpisode:
@@ -240,13 +244,12 @@ def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -
         )
         for agent in resolved.agents
     }
-    failure, result = None, None
+    failure, failure_kind, result = None, None, None
     try:
         result = run_episode(scenario, config, policies)
     except EpisodeInterrupted as exc:
-        if not isinstance(exc.cause, LLMTransportError):
-            raise exc.cause from exc
         failure, result = str(exc.cause), exc.result
+        failure_kind = "transport" if isinstance(exc.cause, LLMTransportError) else "environment"
     turns = sorted(
         (turn for policy in policies.values() for turn in policy.turns),
         key=lambda turn: (turn.logical_time, turn.agent_id),
@@ -263,7 +266,7 @@ def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -
             agent: prompt_sha256(policy.system_prompt) for agent, policy in policies.items()
         },
     }
-    return LLMEpisode(result, turns, failure, prompts)
+    return LLMEpisode(result, turns, failure, prompts, failure_kind)
 
 
 def write_episode(directory: Path, name: str, episode: LLMEpisode) -> None:

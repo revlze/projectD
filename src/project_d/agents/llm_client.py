@@ -4,19 +4,42 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "qwen3:4b-instruct-2507-q4_K_M"
 
 
+@dataclass(frozen=True)
+class HTTPAttempt:
+    outcome: str
+    latency_s: float
+    status_code: int | None = None
+    request_id: str | None = None
+    retry_delay_s: float | None = None
+
+
+@dataclass(frozen=True)
+class HTTPTrace:
+    payload_sha256: str
+    attempts: tuple[HTTPAttempt, ...]
+    elapsed_s: float
+    response_id: str | None = None
+    response_model: str | None = None
+
+
 class LLMTransportError(RuntimeError):
-    """The model server failed. This is never an agent decision or a budget refusal."""
+    """The model server failed before yielding an agent response."""
+
+    def __init__(self, message: str, trace: HTTPTrace | None = None) -> None:
+        super().__init__(message)
+        self.trace = trace
 
 
 @dataclass(frozen=True)
@@ -44,6 +67,7 @@ class ChatResponse:
     finish_reason: str | None = None
     usage: dict[str, Any] = field(default_factory=dict)
     latency_s: float = 0.0
+    http: HTTPTrace | None = None
 
 
 class ChatClient(Protocol):
@@ -85,56 +109,130 @@ class OpenAICompatibleClient:
 
     def chat(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ChatResponse:
         body = json.dumps(self.build_payload(messages, tools), ensure_ascii=False).encode("utf-8")
+        payload_sha256 = hashlib.sha256(body).hexdigest()
+        attempts: list[HTTPAttempt] = []
+        request_started = time.monotonic()
+
+        def trace(raw: dict[str, Any] | None = None) -> HTTPTrace:
+            return HTTPTrace(
+                payload_sha256,
+                tuple(attempts),
+                time.monotonic() - request_started,
+                raw.get("id") if raw else None,
+                raw.get("model") if raw else None,
+            )
+
+        try:
+            headers = self._headers()
+        except LLMTransportError as exc:
+            raise LLMTransportError(str(exc), trace()) from exc
         request = urllib.request.Request(
             f"{self.config.base_url.rstrip('/')}/chat/completions",
             data=body,
-            headers=self._headers(),
+            headers=headers,
             method="POST",
         )
-        last_error: Exception | None = None
         failures = 0
         throttled = 0
         while True:
             started = time.monotonic()
+            status_code = None
+            request_id = None
             try:
                 with urllib.request.urlopen(request, timeout=self.config.timeout_s) as response:
+                    status_code = getattr(response, "status", 200)
+                    request_id = getattr(response, "headers", {}).get("x-request-id")
                     raw = json.loads(response.read().decode("utf-8"))
-                return self._parse(raw, time.monotonic() - started)
+                latency = time.monotonic() - started
+                parsed = self._parse(raw, latency)
+                attempts.append(HTTPAttempt("response", latency, status_code, request_id))
+                return replace(parsed, http=trace(raw))
             except urllib.error.HTTPError as exc:
-                last_error = exc
+                status_code = exc.code
+                request_id = exc.headers.get("x-request-id") if exc.headers else None
                 if exc.code == 429:
-                    # The provider is pacing us; this is not a failed decision, so wait and resend.
                     throttled += 1
-                    if throttled > self.config.rate_limit_retries:
-                        raise LLMTransportError("HTTP 429: rate limit persisted") from exc
                     delay = self.config.rate_limit_backoff_s * 2 ** (throttled - 1)
-                    time.sleep(_retry_after(exc, delay))
+                    retry = (
+                        _retry_after(exc, delay)
+                        if throttled <= self.config.rate_limit_retries
+                        else None
+                    )
+                    attempts.append(
+                        HTTPAttempt(
+                            "rate_limited",
+                            time.monotonic() - started,
+                            status_code,
+                            request_id,
+                            retry,
+                        )
+                    )
+                    if retry is None:
+                        raise LLMTransportError("HTTP 429: rate limit persisted", trace()) from exc
+                    time.sleep(retry)
                     continue
                 if exc.code < 500:
-                    detail = exc.read().decode("utf-8", errors="replace")[:500]
-                    raise LLMTransportError(f"HTTP {exc.code}: {detail}") from exc
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-                last_error = exc
+                    attempts.append(
+                        HTTPAttempt(
+                            "http_error", time.monotonic() - started, status_code, request_id
+                        )
+                    )
+                    raise LLMTransportError(f"HTTP {exc.code}", trace()) from exc
+                outcome, cause = "http_error", exc
+            except LLMTransportError as exc:
+                attempts.append(
+                    HTTPAttempt(
+                        "malformed_response", time.monotonic() - started, status_code, request_id
+                    )
+                )
+                raise LLMTransportError(
+                    str(exc), trace(raw if isinstance(raw, dict) else None)
+                ) from exc
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                UnicodeDecodeError,
+                json.JSONDecodeError,
+                OSError,
+            ) as exc:
+                if isinstance(exc, TimeoutError) or (
+                    isinstance(exc, urllib.error.URLError) and isinstance(exc.reason, TimeoutError)
+                ):
+                    outcome = "timeout"
+                elif isinstance(exc, (json.JSONDecodeError, UnicodeDecodeError)):
+                    outcome = "invalid_encoding"
+                else:
+                    outcome = "network_error"
+                cause = exc
             failures += 1
-            if failures > self.config.retries:
-                raise LLMTransportError(f"model server failed: {last_error!r}") from last_error
-            time.sleep(self.config.retry_backoff_s * failures)
+            retry = (
+                self.config.retry_backoff_s * failures if failures <= self.config.retries else None
+            )
+            attempts.append(
+                HTTPAttempt(outcome, time.monotonic() - started, status_code, request_id, retry)
+            )
+            if retry is None:
+                detail = f"HTTP {status_code}" if outcome == "http_error" else outcome
+                raise LLMTransportError(f"model server failed: {detail}", trace()) from cause
+            time.sleep(retry)
 
     @staticmethod
     def _parse(raw: dict[str, Any], latency_s: float) -> ChatResponse:
         try:
             choice = raw["choices"][0]
             message = choice["message"]
-            if not isinstance(message, dict):
-                raise TypeError("message must be an object")
+            usage = raw.get("usage") or {}
+            if not isinstance(message, dict) or not isinstance(usage, dict):
+                raise TypeError("message and usage must be objects")
         except (KeyError, IndexError, TypeError) as exc:
-            raise LLMTransportError(f"malformed response: {str(raw)[:300]}") from exc
-        return ChatResponse(message, choice.get("finish_reason"), raw.get("usage") or {}, latency_s)
+            raise LLMTransportError("malformed model response") from exc
+        return ChatResponse(message, choice.get("finish_reason"), usage, latency_s)
 
 
 def _retry_after(exc: urllib.error.HTTPError, fallback: float) -> float:
     try:
-        return max(float(exc.headers.get("Retry-After", "")), 0.0)
+        delay = float(exc.headers.get("Retry-After", "")) if exc.headers else fallback
+        return max(delay, 0.0) if math.isfinite(delay) else fallback
     except (TypeError, ValueError):
         return fallback
 
