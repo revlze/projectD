@@ -114,7 +114,7 @@ def test_tracked_u_star_and_schedules(relative: str) -> None:
 
 
 @pytest.mark.parametrize("profile", ("test_s1_01", "test_s1_02"))
-@pytest.mark.parametrize("delay,gap", product((0, 1, 3), (0, 2, 4)))
+@pytest.mark.parametrize("delay,gap", tuple(product((0, 1, 3), (0, 2, 4))))
 @pytest.mark.parametrize("first,swap", REPEATS)
 def test_e4_h1_optimum_with_actual_opening_times(
     profile: str, delay: int, gap: int, first: str, swap: bool

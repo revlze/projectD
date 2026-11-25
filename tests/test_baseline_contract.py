@@ -96,7 +96,7 @@ class RecordingClient:
 
 @pytest.mark.parametrize("variant", E1_VARIANTS)
 @pytest.mark.parametrize("delay", (1, 4, 8))
-@pytest.mark.parametrize("first,swap", product(("A", "B"), (False, True)))
+@pytest.mark.parametrize("first,swap", tuple(product(("A", "B"), (False, True))))
 def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> None:
     scenario = make_scenario(
         a_options=(("full", 7), ("short", 4)), horizon=80, turn_limit=24, message_delay=delay

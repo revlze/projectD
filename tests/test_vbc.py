@@ -688,6 +688,17 @@ def test_audit_detects_mutated_vbc_transitions(event, changes, expected) -> None
     assert any(expected in issue for issue in issues)
 
 
+def test_audit_rejects_repeated_items_within_one_proposal() -> None:
+    result, _, _ = _released_episode()
+    index = next(i for i, e in enumerate(result.log) if e.event_type == "propose_plan")
+    proposal = result.log[index]
+    forged = {**proposal.detail, "items": proposal.detail["items"] * 2}
+    issues = _forged(
+        result, lambda log, r: [*log[:index], r(proposal, detail=forged), *log[index + 1 :]]
+    )
+    assert any("repeated job or alternative" in issue for issue in issues)
+
+
 def test_audit_rejects_forged_schedule_and_release_order() -> None:
     result, _, _ = _released_episode()
     for event, change, expected in (

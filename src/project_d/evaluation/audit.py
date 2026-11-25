@@ -154,11 +154,11 @@ class _ScheduleAudit:
             ):
                 self.issues.append(f"{where}: incorrect missed round")
             self.round_misses.add(missed)
-        elif event in {"agreement", "plan_version", "plan_feedback", "complete"} or (
-            event == "commit" and self.metadata.commit_delay > 0
-        ):
-            if any((peer, time) in self.decisions for peer in self.agents):
-                self.issues.append(f"{where}: scheduled event occurs after a decision in its tick")
+        elif (
+            event in {"agreement", "plan_version", "plan_feedback", "complete"}
+            or (event == "commit" and self.metadata.commit_delay > 0)
+        ) and any((peer, time) in self.decisions for peer in self.agents):
+            self.issues.append(f"{where}: scheduled event occurs after a decision in its tick")
 
     def _decision_window(self, time: int) -> bool:
         slots = self.variant.slot_times
@@ -326,15 +326,41 @@ class _PlanAudit:
         self.vbc1_guard_release = vbc1_guard_release
 
     def propose(self, entry: LogEntry, where: str) -> None:
-        if entry.time not in PROPOSE_TIMES:
+        if not self.variant.structured or entry.time not in PROPOSE_TIMES:
             self.issues.append(f"{where}: proposal outside its phase")
             return
         agent_id = entry.agent_id or ""
-        pairs = [*entry.detail.get("items", ()), *entry.detail.get("disclosed_alternatives", ())]
+        chosen = entry.detail.get("items")
+        alternatives = entry.detail.get("disclosed_alternatives")
+        if (
+            agent_id not in self.agents
+            or not isinstance(chosen, list)
+            or not isinstance(alternatives, list)
+            or not isinstance(entry.detail.get("note"), str)
+            or not all(
+                isinstance(item, dict)
+                and isinstance(item.get("job_id"), str)
+                and isinstance(item.get("option_id"), str)
+                and type(item.get("cost")) is int
+                for item in (*chosen, *alternatives)
+            )
+        ):
+            self.issues.append(f"{where}: invalid proposal contents")
+            return
         if self.metadata.catalog and any(
-            _plan_item_issue(self.metadata, agent_id, item) for item in pairs
+            _plan_item_issue(self.metadata, agent_id, item) for item in (*chosen, *alternatives)
         ):
             self.issues.append(f"{where}: proposal differs from the catalog")
+            return
+        chosen_pairs = {(item["job_id"], item["option_id"]) for item in chosen}
+        alternate_pairs = {(item["job_id"], item["option_id"]) for item in alternatives}
+        if (
+            len({item["job_id"] for item in chosen}) != len(chosen)
+            or len(alternate_pairs) != len(alternatives)
+            or chosen_pairs & alternate_pairs
+        ):
+            self.issues.append(f"{where}: repeated job or alternative in proposal")
+            return
         self.live[agent_id] = entry.detail
 
     def snapshot(self, entry: LogEntry, where: str) -> None:
@@ -352,6 +378,8 @@ class _PlanAudit:
         version = entry.detail.get("plan_version")
         if (
             not self.variant.verify
+            or type(version) is not int
+            or version not in range(1, len(FEEDBACK_TIMES) + 1)
             or version != max(self.versions, default=None)
             or version in self.feedback_versions
             or entry.time != FEEDBACK_TIMES[version - 1]
@@ -437,6 +465,7 @@ class _PlanAudit:
         final = max(self.versions, default=None)
         if (
             entry.time != CONFIRM_TIME
+            or type(version) is not int
             or version != final
             or final != len(SNAPSHOT_TIMES)
             or set(self.versions[final]) != self.agents
