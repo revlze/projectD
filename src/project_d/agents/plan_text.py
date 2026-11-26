@@ -54,7 +54,7 @@ def _plan_block(
 def _check_block(feedback: dict[str, Any], viewer: str, other: str) -> list[str]:
     budget, requested = feedback["budget"], feedback["requested_total"]
     if feedback["status"] == "INCOMPLETE":
-        missing = feedback["missing_plans"]
+        missing = sorted(feedback["missing_plans"])
         absent = (
             f"нет плана агента {missing[0]}"
             if len(missing) == 1

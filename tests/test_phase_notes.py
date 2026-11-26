@@ -66,6 +66,8 @@ def test_incomplete_check_line_agrees_in_number() -> None:
 
     assert line(["B"]) == "- INCOMPLETE: нет плана агента B"
     assert line(["A", "B"]) == "- INCOMPLETE: нет планов агентов A и B"
+    # The same text for both processing orders (T34).
+    assert line(["B", "A"]) == "- INCOMPLETE: нет планов агентов A и B"
 
 
 def test_incomplete_plan_cannot_be_confirmed_even_without_v_feedback() -> None:
