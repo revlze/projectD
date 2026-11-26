@@ -4,7 +4,7 @@
 
 All episodes share one setup (see `g*/run_manifest.json`, identical in all four groups):
 
-- code `fcca9f7` (tag `e1-dev-run`; after the rebase into `master` the same code has another hash), clean tree, prompt `protocol-v2.2`;
+- code `fcca9f7` as recorded in the manifests; in `master` the same `src/` is commit `fc44bab` (only two doc lines differ), clean tree, prompt `protocol-v2.2`;
 - Ollama 0.40.17, model `qwen3-4b-t8:latest` = weights `sha256-85e4a5b7...` of `qwen3:4b-instruct-2507-q4_K_M` plus `num_thread 8`;
 - context 16384, flash attention, KV cache `q8_0`, `OLLAMA_NUM_PARALLEL=8`, temperature 0.3, llm seed = repeat;
 - one RTX 3090 (vast.ai), four runner processes in parallel.

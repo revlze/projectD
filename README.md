@@ -19,7 +19,7 @@ project-d/
 ├── tests/              checks and historical unit-test fixtures
 ├── data/
 │   └── scenarios/      10 dev + 28 test profiles and their SHA-256 manifest
-├── results/e1/         preserved diagnostic dev logs from commit fcca9f7
+├── results/e1/         preserved diagnostic dev logs (code fc44bab in master)
 └── outputs/            run outputs (ignored by git)
 ```
 
