@@ -36,6 +36,8 @@ class AuditReport:
     agreement: str | None = None
     plan_mismatches: int = 0
     tool_statuses: dict[tuple[str, int], str] = field(default_factory=dict)
+    # vbc-4: alternatives dropped from an accepted proposal, by (agent, time).
+    removed_alternatives: dict[tuple[str, int], list[dict[str, str]]] = field(default_factory=dict)
 
     @property
     def consistent(self) -> bool:
@@ -315,6 +317,7 @@ class _PlanAudit:
         self.agents = set(metadata.submission_open_at)
         self.opens_at = min(metadata.submission_open_at.values())
         self.live: dict[str, dict[str, Any]] = {}
+        self.removed: dict[tuple[str, int], list[dict[str, str]]] = {}
         self.versions: dict[int, dict[str, dict[str, Any]]] = {}
         self.confirmations: dict[str, int] = {}
         self.agreement_rows = 0
@@ -331,7 +334,8 @@ class _PlanAudit:
             return
         agent_id = entry.agent_id or ""
         proposal = {k: v for k, v in entry.detail.items() if k != "removed_alternatives"}
-        removed = entry.detail.get("removed_alternatives", [])
+        has_removed = "removed_alternatives" in entry.detail
+        removed = entry.detail.get("removed_alternatives")
         chosen = proposal.get("items")
         alternatives = proposal.get("disclosed_alternatives")
         if (
@@ -339,7 +343,6 @@ class _PlanAudit:
             or not isinstance(chosen, list)
             or not isinstance(alternatives, list)
             or not isinstance(proposal.get("note"), str)
-            or not isinstance(removed, list)
             or not all(
                 isinstance(item, dict)
                 and isinstance(item.get("job_id"), str)
@@ -364,18 +367,25 @@ class _PlanAudit:
         ):
             self.issues.append(f"{where}: repeated job or alternative in proposal")
             return
-        # From vbc-4 the environment drops chosen options from the alternatives and logs them.
-        if removed and (
-            self.metadata.protocol_version in ("vbc-1", "vbc-2", "vbc-3")
-            or not all(
-                isinstance(pair, dict)
-                and (pair.get("job_id"), pair.get("option_id")) in chosen_pairs
-                and set(pair) == {"job_id", "option_id"}
-                for pair in removed
+        # Only vbc-4 drops chosen options from the alternatives; it logs a nonempty list of
+        # distinct chosen pairs, the same list it returned to the agent.
+        if has_removed:
+            well_formed = (
+                self.metadata.protocol_version == "vbc-4"
+                and isinstance(removed, list)
+                and bool(removed)
+                and all(
+                    isinstance(pair, dict)
+                    and set(pair) == {"job_id", "option_id"}
+                    and all(isinstance(value, str) for value in pair.values())
+                    for pair in removed
+                )
             )
-        ):
-            self.issues.append(f"{where}: removed alternatives are not chosen options")
-            return
+            pairs = [(pair["job_id"], pair["option_id"]) for pair in removed] if well_formed else []
+            if not well_formed or len(set(pairs)) != len(pairs) or not set(pairs) <= chosen_pairs:
+                self.issues.append(f"{where}: removed alternatives are not chosen options")
+                return
+            self.removed[agent_id, entry.time] = removed
         self.live[agent_id] = proposal
 
     def snapshot(self, entry: LogEntry, where: str) -> None:
@@ -871,4 +881,5 @@ def audit_episode(
         agreement=plans.agreement,
         plan_mismatches=plan_mismatches,
         tool_statuses=schedule.actions,
+        removed_alternatives=plans.removed,
     )

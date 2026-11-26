@@ -203,6 +203,33 @@ def test_audit_rejects_removed_alternatives_that_were_not_chosen() -> None:
     assert any("removed alternatives" in issue for issue in report.issues)
 
 
+@pytest.mark.parametrize(
+    ("removed", "version"),
+    [
+        ([{"job_id": "job_a", "option_id": "short"}] * 2, "vbc-4"),
+        ([{"job_id": [], "option_id": "short"}], "vbc-4"),
+        ([{"job_id": "job_a", "option_id": "short", "cost": 4}], "vbc-4"),
+        ([], "vbc-4"),
+        ([{"job_id": "job_a", "option_id": "short"}], "vbc-3"),
+        ([{"job_id": "job_a", "option_id": "short"}], ""),
+    ],
+)
+def test_audit_rejects_malformed_or_unversioned_removals(removed, version) -> None:
+    from dataclasses import replace
+
+    result = _stale_alternative_revision()
+    entry = next(e for e in result.log if e.event_type == "propose_plan" and e.time == 33)
+    entry.detail["removed_alternatives"] = removed
+    report = audit_episode(replace(result.metadata, protocol_version=version), result.log)
+    assert any("removed alternatives" in issue for issue in report.issues)
+
+
+def test_audit_reports_removals_for_receipt_checks() -> None:
+    result = _stale_alternative_revision()
+    report = audit_episode(result.metadata, result.log)
+    assert report.removed_alternatives == {("A", 33): [{"job_id": "job_a", "option_id": "short"}]}
+
+
 def test_refused_proposal_tells_why_without_revealing_foreign_jobs() -> None:
     env = Environment(_scenario(), RunConfig.for_protocol("A/VBC"))
     env._now = 33
