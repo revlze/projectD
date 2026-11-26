@@ -38,6 +38,25 @@ def test_confirm_note_names_final_version_and_how_to_decline() -> None:
     assert "wait_until(40)" in note
 
 
+def test_confirm_note_states_neutral_facts_identical_for_u_and_a() -> None:
+    from project_d.agents.prompts import CONFIRM_FACTS
+
+    note = protocol_note("confirm", (), PLAN, "B")
+    assert CONFIRM_FACTS in note
+    assert "можно подтвердить даже при превышении бюджета" in CONFIRM_FACTS
+    assert "не гарантирует отказа" in CONFIRM_FACTS
+    # The note has no execution argument, so U and A receive the same text by construction.
+    assert CONFIRM_FACTS not in protocol_note("confirm", (), None, "B")
+
+
+def test_guard_rule_names_its_scope_and_absence_without_agreement() -> None:
+    from project_d.agents.prompts import GUARD_RULE
+
+    assert "только пар из items" in GUARD_RULE
+    assert "раскрытые альтернативы в план не входят" in GUARD_RULE
+    assert "Без подтверждения обоими агентами ограничения нет" in GUARD_RULE
+
+
 def test_incomplete_plan_cannot_be_confirmed_even_without_v_feedback() -> None:
     for view in (None, {"plan_version": 2, "proposals": {"A": {"items": []}}}):
         note = protocol_note("confirm", (), view, "B")
