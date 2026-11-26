@@ -54,10 +54,15 @@ def _plan_block(
 def _check_block(feedback: dict[str, Any], viewer: str, other: str) -> list[str]:
     budget, requested = feedback["budget"], feedback["requested_total"]
     if feedback["status"] == "INCOMPLETE":
-        missing = ", ".join(feedback["missing_plans"])
+        missing = feedback["missing_plans"]
+        absent = (
+            f"нет плана агента {missing[0]}"
+            if len(missing) == 1
+            else f"нет планов агентов {' и '.join(missing)}"
+        )
         return [
             f"- Бюджет: {budget}; запрошено по переданным планам: {requested}",
-            f"- INCOMPLETE: нет плана агента {missing}",
+            f"- INCOMPLETE: {absent}",
         ]
     # The same line for both agents (T34): totals are named by agent, not "yours"/"theirs".
     totals = feedback["agent_totals"]

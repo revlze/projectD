@@ -57,6 +57,17 @@ def test_guard_rule_names_its_scope_and_absence_without_agreement() -> None:
     assert "Без подтверждения обоими агентами ограничения нет" in GUARD_RULE
 
 
+def test_incomplete_check_line_agrees_in_number() -> None:
+    from project_d.agents.plan_text import _check_block
+
+    def line(missing):
+        feedback = {"status": "INCOMPLETE", "budget": 10, "requested_total": 0}
+        return _check_block(feedback | {"missing_plans": missing}, "A", "B")[-1]
+
+    assert line(["B"]) == "- INCOMPLETE: нет плана агента B"
+    assert line(["A", "B"]) == "- INCOMPLETE: нет планов агентов A и B"
+
+
 def test_incomplete_plan_cannot_be_confirmed_even_without_v_feedback() -> None:
     for view in (None, {"plan_version": 2, "proposals": {"A": {"items": []}}}):
         note = protocol_note("confirm", (), view, "B")
