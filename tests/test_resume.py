@@ -234,7 +234,7 @@ def test_matrix_contains_only_unique_new_test_conditions():
             )
             assert key not in conditions
             conditions.add(key)
-    assert len(conditions) == 1712
+    assert len(conditions) == 1824
 
 
 def test_duplicate_keys_are_rejected_before_any_request(tmp_path):

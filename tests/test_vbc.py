@@ -35,7 +35,7 @@ from project_d.simulation.scheduler import Observation, ScriptedPolicy, run_epis
 from support import make_scenario
 from test_baseline_contract import RecordingClient, response
 
-STRUCTURED = ("A/S", "A/S+V", "A/S+G", "A/VBC", "A/VBC-r0", "A/VBC-r2")
+STRUCTURED = ("A/S", "A/S+V", "A/S+G", "A/VBC", "A/VBC-r0", "A/VBC-r2", "U/VBC")
 A_FULL, A_SHORT, A_MINI = ("job_a", "full"), ("job_a", "short"), ("job_a", "mini")
 B_STANDARD = ("job_b", "standard")
 
@@ -58,22 +58,25 @@ def _events(result, event_type):
     return [entry for entry in result.log if entry.event_type == event_type]
 
 
-def test_six_structured_variants_parse_to_the_spec_table() -> None:
+def test_structured_variants_parse_to_the_spec_table() -> None:
     table = {
-        name: (v.verify, v.guard, len(v.round_times))
+        name: (v.execution, v.verify, v.guard, len(v.round_times))
         for name in STRUCTURED
         for v in [Variant.parse(name)]
     }
     assert table == {
-        "A/S": (False, False, 1),
-        "A/S+V": (True, False, 1),
-        "A/S+G": (False, True, 1),
-        "A/VBC": (True, True, 1),
-        "A/VBC-r0": (True, True, 0),
-        "A/VBC-r2": (True, True, 2),
+        "A/S": ("A", False, False, 1),
+        "A/S+V": ("A", True, False, 1),
+        "A/S+G": ("A", False, True, 1),
+        "A/VBC": ("A", True, True, 1),
+        "A/VBC-r0": ("A", True, True, 0),
+        "A/VBC-r2": ("A", True, True, 2),
+        "U/VBC": ("U", True, True, 1),
     }
     assert Variant.parse("A/VBC-r2").round_times == (13, 20)
-    for retired in ("A/R3P+S", "A/R3P+S+V+G", "U/VBC"):
+    assert all(Variant.parse(name).value == name for name in STRUCTURED)
+    assert not Variant.parse("U/VBC").reserves
+    for retired in ("A/R3P+S", "A/R3P+S+V+G", "U/S", "U/S+G", "U/VBC-r2"):
         with pytest.raises(ValueError):
             Variant.parse(retired)
 
@@ -505,6 +508,26 @@ def test_guard_releases_after_an_agreed_submission_is_refused_for_budget() -> No
     assert refused.status is ToolStatus.INSUFFICIENT_BUDGET
     assert refused.data["plan_released"] is True
     assert any(e.event_type == "plan_released" for e in env.log)
+
+
+@pytest.mark.parametrize(
+    ("variant", "b_result", "spent", "violated"),
+    [("A/VBC", "insufficient_budget", 7, False), ("U/VBC", "accepted", 13, True)],
+)
+def test_u_vbc_differs_from_a_vbc_only_in_reservation(variant, b_result, spent, violated) -> None:
+    """Same confirmed over-budget plan (7 + 6 > 12): A refuses the second job, U overspends."""
+    scenario = make_scenario(budget=12, b_options=(("standard", 6), ("lite", 3)))
+    a = ScriptedPolicy({6: ProposePlan((A_FULL,)), 37: ConfirmPlan(2), 40: SubmitJob(*A_FULL)})
+    b = ScriptedPolicy(
+        {6: ProposePlan((B_STANDARD,)), 37: ConfirmPlan(2), 40: SubmitJob(*B_STANDARD)}
+    )
+    result = run_episode(scenario, RunConfig.for_protocol(variant), {"A": a, "B": b})
+    submits = _events(result, "submit")
+    assert [s.result for s in submits] == ["accepted", b_result]
+    assert all(s.held_after == 0 for s in submits) is (variant == "U/VBC")
+    report = audit_episode(result.metadata, result.log)
+    assert report.consistent, report.issues
+    assert (report.violated, result.spent, result.held) == (violated, spent, 0)
 
 
 def _released_episode():

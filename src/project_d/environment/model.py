@@ -39,14 +39,16 @@ class Comm(StrEnum):
 
 _VARIANT_RE = re.compile(r"^(U|A)/(N|F|R1|R3P|R3)$")
 
-# The six structured protocols: (verify, guard, negotiation rounds).
+# The structured protocols: (execution, verify, guard, negotiation rounds). U/VBC is full VBC
+# without reservation, the U/A pair for H3; its ablations run only with A.
 _STRUCTURED = {
-    "A/S": (False, False, 1),
-    "A/S+V": (True, False, 1),
-    "A/S+G": (False, True, 1),
-    "A/VBC": (True, True, 1),
-    "A/VBC-r0": (True, True, 0),
-    "A/VBC-r2": (True, True, 2),
+    "A/S": ("A", False, False, 1),
+    "A/S+V": ("A", True, False, 1),
+    "A/S+G": ("A", False, True, 1),
+    "A/VBC": ("A", True, True, 1),
+    "A/VBC-r0": ("A", True, True, 0),
+    "A/VBC-r2": ("A", True, True, 2),
+    "U/VBC": ("U", True, True, 1),
 }
 
 
@@ -54,8 +56,9 @@ _STRUCTURED = {
 class Variant:
     """Execution mechanism, communication protocol and VBC components (decisions D17-D19).
 
-    Structured variants are a protocol of their own (``comm=S``) with atomic execution, not
-    flags on top of a baseline: proposals, ``rounds`` negotiation rounds and a confirmation.
+    Structured variants are a protocol of their own (``comm=S``), not flags on top of a
+    baseline: proposals, ``rounds`` negotiation rounds and a confirmation. All use atomic
+    execution except ``U/VBC``.
     """
 
     execution: str
@@ -72,11 +75,10 @@ class Variant:
             raise ScenarioError("V and G require S")
         if self.structured != (self.comm is Comm.S):
             raise ScenarioError("structured proposals are the S protocol and only it")
-        if self.structured and self.execution != "A":
-            raise ScenarioError("structured protocols use atomic execution")
-        if self.structured and (self.verify, self.guard, self.rounds) not in _STRUCTURED.values():
+        if self.structured and self._structured_key not in _STRUCTURED.values():
             raise ScenarioError(
-                f"no structured protocol with V={self.verify}, G={self.guard}, r={self.rounds}"
+                f"no structured protocol {self.execution} with V={self.verify}, "
+                f"G={self.guard}, r={self.rounds}"
             )
         if not self.structured and self.rounds:
             raise ScenarioError("only structured protocols take a round count")
@@ -84,17 +86,21 @@ class Variant:
     @classmethod
     def parse(cls, name: str) -> Variant:
         if name in _STRUCTURED:
-            verify, guard, rounds = _STRUCTURED[name]
-            return cls("A", Comm.S, True, verify, guard, rounds)
+            execution, verify, guard, rounds = _STRUCTURED[name]
+            return cls(execution, Comm.S, True, verify, guard, rounds)
         match = _VARIANT_RE.match(name)
         if match is None:
             raise ScenarioError(f"unknown variant {name!r}")
         return cls(match.group(1), Comm(match.group(2)))
 
     @property
+    def _structured_key(self) -> tuple[str, bool, bool, int]:
+        return (self.execution, self.verify, self.guard, self.rounds)
+
+    @property
     def value(self) -> str:
         if self.structured:
-            key = (self.verify, self.guard, self.rounds)
+            key = self._structured_key
             return next(name for name, flags in _STRUCTURED.items() if flags == key)
         return f"{self.execution}/{self.comm.value}"
 

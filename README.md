@@ -44,7 +44,7 @@ uv run python -m project_d.experiments.generator --check data/scenarios
 uv run python -m project_d.experiments.matrix E1 --dry-run
 ```
 
-Dry runs describe the complete research matrix: E1=640, E2=1232, E3=240, E4-H1=144 and E4-delay=96 new episodes. The LLM runner accepts ten baseline and six structured variants. Select the development baseline subset with:
+Dry runs describe the complete research matrix: E1=680, E2=1344, E3=240, E4-H1=144 and E4-delay=96 new episodes. The LLM runner accepts ten baseline and seven structured variants (`U/VBC` is full VBC without reservation). Select the development baseline subset with:
 
 ```bash
 uv run python -m project_d.experiments.matrix E1 --baseline-only --dry-run

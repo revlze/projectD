@@ -29,7 +29,7 @@ class FinishClient:
 
 @pytest.mark.parametrize(
     ("series", "episodes"),
-    [("E1", 640), ("E2", 1232), ("E3", 240), ("E4-H1", 144), ("E4-delay", 96)],
+    [("E1", 680), ("E2", 1344), ("E3", 240), ("E4-H1", 144), ("E4-delay", 96)],
 )
 def test_matrix_sizes_match_plan(series: str, episodes: int) -> None:
     specs = build_matrix(series, load_manifest(ROOT))
