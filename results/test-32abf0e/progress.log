@@ -1,0 +1,9 @@
+2026-11-26T10:03:35Z E2 start -> outputs/e2-32abf0e
+2026-11-26T10:27:50Z E2 rc=0 {"episodes": 1344, "failed": 0, "audit_issues": 0}
+2026-11-26T10:27:50Z E3 start -> outputs/e3-32abf0e
+2026-11-26T10:32:55Z E3 rc=0 {"episodes": 240, "failed": 0, "audit_issues": 0}
+2026-11-26T10:32:55Z E4-H1 start -> outputs/e4-h1-32abf0e
+2026-11-26T10:35:26Z E4-H1 rc=0 {"episodes": 144, "failed": 0, "audit_issues": 0}
+2026-11-26T10:35:26Z E4-delay start -> outputs/e4-delay-32abf0e
+2026-11-26T10:37:21Z E4-delay rc=0 {"episodes": 96, "failed": 0, "audit_issues": 0}
+2026-11-26T10:37:21Z ALL DONE
