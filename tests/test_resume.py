@@ -111,8 +111,8 @@ def test_successful_resume_makes_no_requests(tmp_path):
     assert run(tmp_path, client=NoCalls()) == rows
 
 
-def _update_receipt(root: Path, suffix: str, path: Path) -> None:
-    receipt_path = root / f"{SPEC.name}.receipt.json"
+def _update_receipt(root: Path, suffix: str, path: Path, spec: EpisodeSpec = SPEC) -> None:
+    receipt_path = root / f"{spec.name}.receipt.json"
     receipt = json.loads(receipt_path.read_bytes())
     receipt["sha256"][suffix] = file_sha256(path)
     receipt_path.write_text(json.dumps(receipt), encoding="utf-8")
@@ -160,6 +160,21 @@ def test_resume_rejects_inconsistent_decisions_with_updated_checksum(tmp_path, m
     _update_receipt(tmp_path, "llm.jsonl", path)
     with pytest.raises(ValueError, match=error):
         run(tmp_path)
+
+
+def test_resume_rejects_removed_alternatives_missing_from_the_journal(tmp_path):
+    """vbc-4: the tool result and the journal must name the same removed alternatives."""
+    spec = EpisodeSpec("E1", "dev/dev_s2_01.json", "A/VBC", 0)
+    run(tmp_path, spec=spec)
+    path = tmp_path / f"{spec.name}.llm.jsonl"
+    turns = [json.loads(line) for line in path.read_bytes().splitlines()]
+    proposal = next(t for t in turns if (t["parsed_action"] or "").startswith("ProposePlan"))
+    pair = {"job_id": "x", "option_id": "y"}
+    proposal["tool_result"]["data"]["removed_alternatives"] = [pair]
+    path.write_text("".join(json.dumps(turn) + "\n" for turn in turns), encoding="utf-8")
+    _update_receipt(tmp_path, "llm.jsonl", path, spec)
+    with pytest.raises(ValueError, match="incomplete request or tool outcome"):
+        run(tmp_path, spec=spec)
 
 
 def test_independent_audit_rejects_damaged_journal_even_with_updated_checksum(tmp_path):

@@ -151,6 +151,8 @@ class RunStore:
                 or turn.tool_result.get("logical_time") != turn.logical_time
                 or turn.tool_result.get("status")
                 != report.tool_statuses[turn.agent_id, turn.logical_time]
+                or (turn.tool_result.get("data") or {}).get("removed_alternatives")
+                != report.removed_alternatives.get((turn.agent_id, turn.logical_time))
                 or turn.transport_error is not None
             ):
                 raise ValueError(f"{name}: incomplete request or tool outcome")
