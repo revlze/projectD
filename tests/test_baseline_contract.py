@@ -155,7 +155,13 @@ def test_phases_requests_privacy_and_execution(variant, delay, first, swap) -> N
         if turn.logical_time >= config.submission_open_at:
             assert "Фактические состояния" in latest
         if turn.logical_time == config.submission_open_at:
-            assert "Началось окно исполнения" in latest
+            own_open = config.open_times(("A", "B"))[turn.agent_id]
+            if own_open == config.submission_open_at:
+                assert "Началось окно исполнения" in latest
+            else:
+                # A lagging agent is not told that its own window has begun (start_gap > 0).
+                assert "Началось окно исполнения" not in latest
+                assert f"твоя подача откроется только в t={own_open}" in latest
     for agent in ("A", "B"):
         times = [turn.logical_time for turn in episode.turns if turn.agent_id == agent]
         assert 40 in times

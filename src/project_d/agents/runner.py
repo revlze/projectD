@@ -104,7 +104,17 @@ class LLMPolicy:
             phase, observation.inbox, observation.plan_view, self.other_agent, plan_text
         )
         if phase in ("execution", "execution_wait") and observation.phase_started:
-            note += "Началось окно исполнения. Показаны фактические статусы собственных работ.\n"
+            if observation.logical_time >= observation.submission_open_at:
+                note += (
+                    "Началось окно исполнения. Показаны фактические статусы собственных работ.\n"
+                )
+            else:
+                # Only with start_gap > 0 (E4-H1): the other agent may already submit.
+                note += (
+                    "Подготовка закончилась, но твоя подача откроется только в "
+                    f"t={observation.submission_open_at}. Показаны фактические статусы "
+                    "собственных работ.\n"
+                )
         for notice in observation.protocol_notices:
             note += f"{notice}\n"
         window = (
