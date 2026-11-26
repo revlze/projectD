@@ -12,6 +12,8 @@ import urllib.request
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
+from project_d.agents.request_metadata import build_request_metadata
+
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "qwen3:4b-instruct-2507-q4_K_M"
 
@@ -32,6 +34,7 @@ class HTTPTrace:
     elapsed_s: float
     response_id: str | None = None
     response_model: str | None = None
+    metadata: dict[str, str] | None = None
 
 
 class LLMTransportError(RuntimeError):
@@ -59,6 +62,7 @@ class LLMConfig:
     tool_call_id_style: str = "plain"
     rate_limit_retries: int = 8
     rate_limit_backoff_s: float = 2.0
+    request_metadata: bool = False
 
 
 @dataclass(frozen=True)
@@ -96,6 +100,14 @@ class OpenAICompatibleClient:
             payload[self.config.seed_field] = self.config.seed
         if self.config.reasoning_effort is not None:
             payload["reasoning_effort"] = self.config.reasoning_effort
+        if self.config.request_metadata:
+            payload["metadata"] = build_request_metadata(
+                call_type=(
+                    "secondary_call"
+                    if messages and messages[-1].get("role") == "tool"
+                    else "main_call"
+                ),
+            )
         return payload
 
     def _headers(self) -> dict[str, str]:
@@ -108,7 +120,8 @@ class OpenAICompatibleClient:
         return headers
 
     def chat(self, messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> ChatResponse:
-        body = json.dumps(self.build_payload(messages, tools), ensure_ascii=False).encode("utf-8")
+        payload = self.build_payload(messages, tools)
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         payload_sha256 = hashlib.sha256(body).hexdigest()
         attempts: list[HTTPAttempt] = []
         request_started = time.monotonic()
@@ -120,6 +133,7 @@ class OpenAICompatibleClient:
                 time.monotonic() - request_started,
                 raw.get("id") if raw else None,
                 raw.get("model") if raw else None,
+                payload.get("metadata"),
             )
 
         try:
@@ -177,7 +191,11 @@ class OpenAICompatibleClient:
                             "http_error", time.monotonic() - started, status_code, request_id
                         )
                     )
-                    raise LLMTransportError(f"HTTP {exc.code}", trace()) from exc
+                    detail = exc.read().decode("utf-8", errors="replace")
+                    print(f"HTTP {exc.code}: {detail}")
+                    raise LLMTransportError(
+                        f"HTTP {exc.code}: {detail}", trace()
+                    ) from exc
                 outcome, cause = "http_error", exc
             except LLMTransportError as exc:
                 attempts.append(

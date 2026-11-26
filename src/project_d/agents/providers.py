@@ -21,6 +21,7 @@ PROVIDERS: dict[str, dict[str, Any]] = {
         "max_tokens": 2048,
         "seed_field": "random_seed",
         "tool_call_id_style": "alnum9",
+        "request_metadata": True,
     },
 }
 

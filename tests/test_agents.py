@@ -183,3 +183,32 @@ def test_mistral_profile_adapts_seed_and_call_ids() -> None:
 def test_ollama_profile_keeps_baseline_payload() -> None:
     config = provider_config("ollama", LLMConfig(seed=3))
     assert config == LLMConfig(seed=3)
+
+
+def test_metadata_marks_main_and_secondary_calls() -> None:
+    client = OpenAICompatibleClient(provider_config("mistral", LLMConfig()))
+    main = client.build_payload([{"role": "user", "content": "test"}], [])["metadata"]
+    followup = client.build_payload([{"role": "tool", "content": "test"}], [])["metadata"]
+    empty = client.build_payload([], [])["metadata"]
+    assert main == {"call_type": "main_call", "call_source": "vibe_code"}
+    assert followup == {"call_type": "secondary_call", "call_source": "vibe_code"}
+    assert empty == main
+
+
+@pytest.mark.parametrize("provider", ("ollama", "mimo"))
+def test_other_providers_do_not_send_metadata(provider: str) -> None:
+    client = OpenAICompatibleClient(provider_config(provider, LLMConfig()))
+    assert "metadata" not in client.build_payload([], [])
+
+
+def test_mistral_metadata_is_sent_and_reused_on_retry(server: str, monkeypatch) -> None:
+    monkeypatch.setenv("MISTRAL_API_KEY", "test-only")
+    config = provider_config(
+        "mistral", LLMConfig(), base_url=server, retry_backoff_s=0, rate_limit_backoff_s=0
+    )
+    _Handler.statuses = [429, 500]
+    response = OpenAICompatibleClient(config).chat([], [])
+    assert len(_Handler.payloads) == 3
+    assert _Handler.payloads[0] == _Handler.payloads[1] == _Handler.payloads[2]
+    assert response.http is not None
+    assert response.http.metadata == _Handler.payloads[0]["metadata"]
