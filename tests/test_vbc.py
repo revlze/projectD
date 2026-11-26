@@ -20,7 +20,7 @@ from project_d.environment.actions import (
     SubmitJob,
     ToolStatus,
 )
-from project_d.environment.env import PLAN_ERROR_TEXT, Environment
+from project_d.environment.env import PLAN_ERROR_TEXT, REMOVED_ALTERNATIVES_TEXT, Environment
 from project_d.environment.model import (
     CONFIRM_TIME,
     PROPOSE_TIMES,
@@ -151,7 +151,7 @@ def test_t27_empty_missing_and_skipped_revision() -> None:
     ("plan", "reason"),
     [
         (ProposePlan((A_FULL,), (A_SHORT, A_SHORT)), "duplicate_alternative"),
-        (ProposePlan((A_FULL,), (A_FULL,)), "chosen_option_as_alternative"),
+        (ProposePlan((A_FULL, A_SHORT)), "two_options_for_job"),
     ],
 )
 def test_proposal_format_errors_are_refused(plan, reason) -> None:
@@ -167,15 +167,48 @@ def test_proposal_format_errors_are_refused(plan, reason) -> None:
     assert call.result.data == {"error": PLAN_ERROR_TEXT[reason]}
 
 
-def test_rejected_revision_tells_the_agent_why_without_revealing_foreign_jobs() -> None:
-    """A switch to an option still listed as an alternative is refused with its reason."""
+def _stale_alternative_revision():
+    """A switches to short at t=33 but keeps it among its t=6 alternatives."""
+    a = ScriptedPolicy(
+        {6: ProposePlan((A_FULL,), (A_SHORT,)), 33: ProposePlan((A_SHORT,), (A_SHORT, A_MINI))}
+    )
+    b = ScriptedPolicy({6: ProposePlan((B_STANDARD,))})
+    return run_episode(_scenario(), RunConfig.for_protocol("A/VBC"), {"A": a, "B": b})
+
+
+def test_revision_keeps_a_switch_to_a_listed_alternative() -> None:
+    """vbc-4: a chosen option is dropped from the alternatives instead of losing the revision."""
+    result = _stale_alternative_revision()
+    revision = next(e for e in _events(result, "propose_plan") if e.time == 33)
+    assert revision.result == "ok"
+    assert revision.detail["removed_alternatives"] == [{"job_id": "job_a", "option_id": "short"}]
+    final = _events(result, "plan_version")[-1].detail["proposals"]["A"]
+    assert [(i["job_id"], i["option_id"]) for i in final["items"]] == [A_SHORT]
+    assert [(i["job_id"], i["option_id"]) for i in final["disclosed_alternatives"]] == [A_MINI]
+    assert "removed_alternatives" not in final
+    (call,) = [c for c in result.calls if isinstance(c.action, ProposePlan) and c.time == 33]
+    assert call.result.data == {
+        "recorded": True,
+        "removed_alternatives": [{"job_id": "job_a", "option_id": "short"}],
+        "notice": REMOVED_ALTERNATIVES_TEXT,
+    }
+    assert audit_episode(result.metadata, result.log).consistent
+
+
+def test_audit_rejects_removed_alternatives_that_were_not_chosen() -> None:
+    result = _stale_alternative_revision()
+    entry = next(e for e in result.log if e.event_type == "propose_plan" and e.time == 33)
+    entry.detail["removed_alternatives"] = [{"job_id": "job_a", "option_id": "full"}]
+    report = audit_episode(result.metadata, result.log)
+    assert any("removed alternatives" in issue for issue in report.issues)
+
+
+def test_refused_proposal_tells_why_without_revealing_foreign_jobs() -> None:
     env = Environment(_scenario(), RunConfig.for_protocol("A/VBC"))
     env._now = 33
-    switched = env.execute("A", ProposePlan((A_SHORT,), (A_SHORT, A_MINI)))
-    assert switched.status is ToolStatus.INVALID_PLAN
-    assert "невыбранные" in switched.data["error"]
     foreign = env.execute("A", ProposePlan((B_STANDARD,)))
     unknown = env.execute("A", ProposePlan((("job_x", "full"),)))
+    assert foreign.status is unknown.status is ToolStatus.INVALID_PLAN
     assert foreign.data == unknown.data == {"error": PLAN_ERROR_TEXT["unknown_job"]}
     assert env.execute("A", ProposePlan((A_SHORT,), (A_FULL, A_MINI))).status is ToolStatus.OK
 

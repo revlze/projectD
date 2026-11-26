@@ -330,13 +330,16 @@ class _PlanAudit:
             self.issues.append(f"{where}: proposal outside its phase")
             return
         agent_id = entry.agent_id or ""
-        chosen = entry.detail.get("items")
-        alternatives = entry.detail.get("disclosed_alternatives")
+        proposal = {k: v for k, v in entry.detail.items() if k != "removed_alternatives"}
+        removed = entry.detail.get("removed_alternatives", [])
+        chosen = proposal.get("items")
+        alternatives = proposal.get("disclosed_alternatives")
         if (
             agent_id not in self.agents
             or not isinstance(chosen, list)
             or not isinstance(alternatives, list)
-            or not isinstance(entry.detail.get("note"), str)
+            or not isinstance(proposal.get("note"), str)
+            or not isinstance(removed, list)
             or not all(
                 isinstance(item, dict)
                 and isinstance(item.get("job_id"), str)
@@ -361,7 +364,19 @@ class _PlanAudit:
         ):
             self.issues.append(f"{where}: repeated job or alternative in proposal")
             return
-        self.live[agent_id] = entry.detail
+        # From vbc-4 the environment drops chosen options from the alternatives and logs them.
+        if removed and (
+            self.metadata.protocol_version in ("vbc-1", "vbc-2", "vbc-3")
+            or not all(
+                isinstance(pair, dict)
+                and (pair.get("job_id"), pair.get("option_id")) in chosen_pairs
+                and set(pair) == {"job_id", "option_id"}
+                for pair in removed
+            )
+        ):
+            self.issues.append(f"{where}: removed alternatives are not chosen options")
+            return
+        self.live[agent_id] = proposal
 
     def snapshot(self, entry: LogEntry, where: str) -> None:
         version = len(self.versions) + 1

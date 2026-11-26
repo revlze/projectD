@@ -118,11 +118,10 @@ PLAN_ERROR_TEXT = {
     "unknown_option": "в твоей работе нет указанного option_id.",
     "two_options_for_job": "в items больше одного варианта одной работы.",
     "duplicate_alternative": "одна альтернатива указана дважды.",
-    "chosen_option_as_alternative": (
-        "вариант из items указан и в disclosed_alternatives; "
-        "альтернативами указывай только невыбранные варианты."
-    ),
 }
+REMOVED_ALTERNATIVES_TEXT = (
+    "Эти варианты выбраны в items, поэтому убраны из disclosed_alternatives; предложение записано."
+)
 
 PLAN_RELEASED_NOTICE = (
     "PLAN_RELEASED: ограничение согласованного плана снято из-за отказа по бюджету."
@@ -236,7 +235,7 @@ class Environment:
             variant=self.variant.value,
             preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
             execution_turn_limit=min(12, self.scenario.agent_turn_limit),
-            protocol_version="vbc-3" if self.variant.structured else "baseline-phases-1",
+            protocol_version="vbc-4" if self.variant.structured else "baseline-phases-1",
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -704,8 +703,6 @@ class Environment:
         alternatives = list(action.disclosed_alternatives)
         if len(alternatives) != len(set(alternatives)):
             return "duplicate_alternative"
-        if set(alternatives) & set(action.items):
-            return "chosen_option_as_alternative"
         return None
 
     def _propose(self, agent_id: str, action: ProposePlan) -> ToolResult:
@@ -722,16 +719,28 @@ class Environment:
                 {"reason": error},
                 data={"error": PLAN_ERROR_TEXT[error]},
             )
+        # A chosen option is not an alternative of its own (vbc-4): drop it instead of refusing
+        # the whole proposal, which used to cost the agent its revision.
+        chosen = set(action.items)
+        removed = [pair for pair in action.disclosed_alternatives if pair in chosen]
         proposal = {
             "items": [self._plan_entry(*pair) for pair in action.items],
             "disclosed_alternatives": [
-                self._plan_entry(*pair) for pair in action.disclosed_alternatives
+                self._plan_entry(*pair)
+                for pair in action.disclosed_alternatives
+                if pair not in chosen
             ],
             "note": action.note,
         }
         self._proposals[agent_id] = proposal
-        self._record("propose_plan", ToolStatus.OK.value, agent_id=agent_id, detail=proposal)
-        return self._result(agent_id, ToolStatus.OK, {"recorded": True})
+        data: dict[str, Any] = {"recorded": True}
+        detail: dict[str, Any] = dict(proposal)
+        if removed:
+            pairs = [{"job_id": job_id, "option_id": option_id} for job_id, option_id in removed]
+            detail["removed_alternatives"] = pairs
+            data |= {"removed_alternatives": pairs, "notice": REMOVED_ALTERNATIVES_TEXT}
+        self._record("propose_plan", ToolStatus.OK.value, agent_id=agent_id, detail=detail)
+        return self._result(agent_id, ToolStatus.OK, data)
 
     def _confirm(self, agent_id: str, plan_version: int) -> ToolResult:
         if not self.variant.structured or self._now != CONFIRM_TIME:
