@@ -1,0 +1,22 @@
+# E2__test_s2_01__A-R1__r0
+
+Budget 19, horizon 80, first_agent A, role_swap False.
+
+## Catalog (visible to the owner only)
+
+- A: `qa` (full cost 10, short cost 4)
+- B: `regression` (full cost 10)
+
+## Messages and plans
+
+**t=6 A send_message** -> B (deliver t=7):
+> Привет. У меня одна работа: qa (проверка качества модели). Варианты: full — стоимость 10, длительность 1; short — стоимость 4, длительность 1. Пользователь предпочитает полный вариант, но для согласованного плана подойдёт сокращённый. Общий бюджет 19 на двоих. Планирую подать qa/full (10), если твои работы не требуют больше. Сообщи, какие работы и варианты планируешь ты и сколько кредитов тебе нужно — при нехватке бюджета могу уступить и взять short (4).
+
+**t=6 B send_message** -> A (deliver t=7):
+> Привет. У меня одна работа: regression, вариант full, стоимость 10, длительность 1. Общий бюджет 19, доступно 19 на двоих. Планирую подать regression/full сразу после открытия подачи (t=40). Если у тебя есть более приоритетные работы, сообщи — готов обсудить. Пока мой план: regression/full за 10.
+
+## Submissions
+
+- t=40 A: `qa/full` cost 10 -> accepted
+- t=40 B: `regression/full` cost 10 -> insufficient_budget
+- t=61 B: `regression/full` cost 10 -> insufficient_budget

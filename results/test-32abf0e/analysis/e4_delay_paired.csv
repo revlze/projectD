@@ -1,0 +1,5 @@
+variant,reference,metric,profiles,variant_mean,reference_mean,mean_difference,profiles_better,profiles_worse,profiles_tied,family_mean_difference
+A/R3P@4,A/R3P@1,safe_fraction,6,0.9638,0.9689,-0.0051,4,2,0,"{""S4"": -0.0051467992694607485}"
+A/R3P@8,A/R3P@1,safe_fraction,6,0.9671,0.9689,-0.0018,2,4,0,"{""S4"": -0.0018490911919869328}"
+A/VBC@4,A/VBC@1,safe_fraction,6,0.9658,0.9740,-0.0082,1,5,0,"{""S4"": -0.008224042597744766}"
+A/VBC@8,A/VBC@1,safe_fraction,6,0.9632,0.9740,-0.0108,3,2,1,"{""S4"": -0.010769833860334532}"

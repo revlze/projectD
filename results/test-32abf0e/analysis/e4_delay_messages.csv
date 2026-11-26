@@ -1,0 +1,7 @@
+variant,message_delay,sent,read,never_read,mean_send_to_read
+A/R3P,1,144,144,0,11.3333
+A/R3P,4,144,144,0,11.3333
+A/R3P,8,96,96,0,17.0000
+A/VBC,1,48,48,0,20.0000
+A/VBC,4,48,48,0,20.0000
+A/VBC,8,48,48,0,20.0000

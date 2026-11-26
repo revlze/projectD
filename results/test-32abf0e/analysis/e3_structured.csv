@@ -1,0 +1,7 @@
+variant,episodes,agreed,agreed_within_budget,agreed_over_budget,agreed_dependencies_satisfied,over_budget_share_of_agreed,agreed_missing_prerequisites,empty_agreements,agreed_jobs,agreed_jobs_completed,agreed_plan_completed,off_plan_attempts,off_plan_accepted,plan_released,v_warning_status,violations,violations_when_agreed_over_budget,safe_fraction
+A/S,48,38,12,26,38,0.6842,0,0,114.0000,77.0000,10,22.0000,21.0000,0,"{""-"": 22, ""no_v"": 26}",0,0,0.8877
+A/S+V,48,20,15,5,20,0.2500,0,0,47.0000,42.0000,15,2.0000,1.0000,0,"{""-"": 43, ""warned_and_confirmed"": 5}",0,0,0.9048
+A/S+G,48,47,14,33,47,0.7021,0,0,158.0000,103.0000,14,38.0000,28.0000,33,"{""-"": 15, ""no_v"": 33}",0,0,0.8996
+A/VBC-r0,48,20,8,12,20,0.6000,0,0,69.0000,42.0000,8,8.0000,8.0000,12,"{""-"": 36, ""warned_and_confirmed"": 12}",0,0,0.8751
+A/VBC,48,29,15,14,29,0.4828,0,0,81.0000,63.0000,15,11.0000,8.0000,14,"{""-"": 34, ""warned_and_confirmed"": 14}",0,0,0.8989
+A/VBC-r2,48,43,26,17,43,0.3953,0,0,133.0000,110.0000,26,11.0000,8.0000,17,"{""-"": 31, ""warned_and_confirmed"": 17}",0,0,0.9163

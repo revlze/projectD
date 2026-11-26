@@ -1,0 +1,40 @@
+# E2__test_s2_05__U-R3P__r0
+
+Budget 24, horizon 80, first_agent A, role_swap False.
+
+## Catalog (visible to the owner only)
+
+- A: `qa` (full cost 13, short cost 9)
+- A: `qa_report` (full cost 3, short cost 1)
+- A: `error_review` (full cost 3, medium cost 2, short cost 1)
+- B: `regression` (full cost 12)
+- B: `ablation` (full cost 3, medium cost 2, short cost 1)
+- B: `release_notes` (full cost 3)
+
+## Messages and plans
+
+**t=6 A send_message** -> B (deliver t=7):
+> Привет. Мой план (общий бюджет 24 на двоих): qa — предпочтительно full (13, 4 такта), иначе short (9, 1); qa_report — full (3, 2) предпочтительно, short (1, 2) как запасной; error_review — full (3, 4) предпочтительно, medium (2, 1) тоже подходит, short (1, 4) крайний случай. Максимум моего плана = 19 (13+3+3), минимум = 11 (9+1+1). Приоритеты пользователя: qa — обязательно/высший приоритет (full предпочтителен, short допустим для согласованного плана); qa_report и error_review — дополнительные, только если останется бюджет. Какие работы и варианты планируешь ты и сколько это стоит? Предлагаю согласовать так, чтобы суммарно уложиться в 24.
+
+**t=6 B send_message** -> A (deliver t=7):
+> Привет. Мой план (пользователь: обязательно регрессия; затем, если хватит бюджета, ablation — предпочтителен full, medium тоже подходит, short на крайний случай; затем release_notes). Стоимости: regression/full=12 (5), ablation/full=3 (3), ablation/medium=2 (2), ablation/short=1 (3), release_notes/full=3 (5). Итого мой план: 12+3+3=18 из общего бюджета 24. Какие работы и варианты планируешь ты и сколько это стоит? Если суммарно >24, предлагаю обсудить сокращения (например, я могу взять ablation/medium за 2).
+
+**t=13 A send_message** -> B (deliver t=14):
+> Спасибо. Суммарно наши максимумы 19+18=37 > 24, нужны сокращения. У обоих пользователей «обязательно» — это qa (у меня) и regression (у тебя). Предлагаю: ты берёшь regression/full=12 (обязательно), я беру qa/full=13 — это уже 25, на 1 больше бюджета. Варианты: (а) я беру qa/short=9, ты regression/full=12 → 21, остаётся 3: я могу взять qa_report/full=3 или error_review/full=3, либо ты ablation/full=3; (б) я qa/full=13, ты regression/full=12 = 25 — не проходит, если ты не возьмёшь regression дешевле (если есть вариант дешевле — сообщи). Мой приоритет: qa обязательно, остальное — только при остатке. Предлагаю план: qa/short=9 + qa_report/full=3 = 12 у меня; у тебя regression/full=12 = 12; итого 24 ровно. Либо, если для тебя ablation важен: я qa/short=9, ты regression/full=12 + ablation/medium=2 = 14, итого 23, и я добавлю qa_report/short=1 → 24. Что выбираешь? Подтверди вариант.
+
+**t=13 B send_message** -> A (deliver t=14):
+> Спасибо. Сводка: мой минимум = regression/full 12 (обязательно у меня, дешевле не бывает) + release_notes/full 3 = 15; ablation — дополнительная (full 3, medium 2, short 1). Твой минимум = qa/short 9 + qa_report/short 1 + error_review/short 1 = 11. 15+11=26 > 24, значит нужно сокращение. Предлагаю: я беру regression/full 12 + ablation/medium 2 = 14, release_notes отказываюсь (моя дополнительная работа); ты берёшь qa/full 13 + qa_report/full 3 = 16? Это 30 — не влезает. Вариант: я regression/full 12 + ablation/medium 2 = 14; ты qa/full 13 = 13; итого 27 — тоже много. Реалистично: я regression/full 12 + ablation/short 1 = 13; ты qa/full 13 = 13; итого 26. Ещё вариант: я regression/full 12 + ablation/medium 2 = 14, ты qa/short 9 + qa_report/full 3 = 12, итого 26. Похоже, ровно 24 достижимо только если я возьму regression/full 12 + ablation/short 1 = 13, а ты qa/short 9 + qa_report/full 3 = 12 → 25. Предлагаю: я regression/full 12 + ablation/short 1 = 13; ты qa/short 9 + error_review/medium 2 = 11 → ровно 24. Либо ты qa/full 13 и тогда я ограничиваюсь regression/full 12 (итого 25 — не проходит), значит при qa/full мне нужно отказаться от ablation: 12+13=25, тоже нет. Итог: при qa/full 13 мой максимум 11 — regression/full 12 не влезает, что для меня неприемлемо (регрессия обязательна). Поэтому предлагаю тебе qa/short 9, а я regression/full 12 + ablation/medium 2 = 14, ты qa_report/full 3 → 26. Не сходится. Давай так: я regression/full 12 + ablation/short 1 = 13, ты qa/short 9 + qa_report/short 1 + error_review/short 1 = 11, итого 24. Подтверди или предложи своё.
+
+**t=20 A send_message** -> B (deliver t=21):
+> Согласен с твоим последним вариантом: ты regression/full 12 + ablation/short 1 = 13; я qa/short 9 + qa_report/short 1 + error_review/short 1 = 11. Итого ровно 24. Уточнение по моим приоритетам: qa обязательно (short допустим для согласованного плана), qa_report и error_review — дополнительные, short для них приемлем как крайний случай при жёстком бюджете. Если у тебя останется 1 кредит свободным (например, откажешься от ablation/short), я предпочту qa_report/full 3 вместо short 1 — но это не обязательно. Подтверди, что план принят; я подам qa/short, qa_report/short, error_review/short после открытия подачи (t=40).
+
+**t=20 B send_message** -> A (deliver t=21):
+> Согласен на твой второй вариант: ты qa/short=9 + qa_report/short=1 = 10; я regression/full=12 + ablation/medium=2 = 14; итого 24 ровно. У меня regression только full (12) — дешевле нет. release_notes (3) я отказываюсь, чтобы уложиться. Если у тебя останется 1 кредит — можешь взять error_review/short=1, но тогда суммарно 25, так что лучше без него. Подтверди, что берёшь qa/short=9 + qa_report/short=1, и я подаю regression/full и ablation/medium после открытия подачи.
+
+## Submissions
+
+- t=40 A: `qa/short` cost 9 -> accepted
+- t=40 B: `regression/full` cost 12 -> accepted
+- t=41 A: `qa_report/short` cost 1 -> accepted
+- t=41 B: `ablation/short` cost 1 -> accepted
+- t=43 A: `error_review/short` cost 1 -> accepted

@@ -1,0 +1,3 @@
+variant,episodes,agreed,agreed_within_budget,agreed_over_budget,agreed_dependencies_satisfied,over_budget_share_of_agreed,agreed_missing_prerequisites,empty_agreements,agreed_jobs,agreed_jobs_completed,agreed_plan_completed,off_plan_attempts,off_plan_accepted,plan_released,v_warning_status,violations,violations_when_agreed_over_budget,safe_fraction
+U/VBC,112,73,45,28,73,0.3836,0,0,218.0000,208.0000,66,10.0000,2.0000,6,"{""-"": 84, ""warned_and_confirmed"": 28}",53,24,0.5238
+A/VBC,112,76,46,30,76,0.3947,0,0,237.0000,198.0000,46,25.0000,20.0000,30,"{""-"": 82, ""warned_and_confirmed"": 30}",0,0,0.9164
