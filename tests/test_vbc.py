@@ -224,6 +224,21 @@ def test_audit_rejects_malformed_or_unversioned_removals(removed, version) -> No
     assert any("removed alternatives" in issue for issue in report.issues)
 
 
+@pytest.mark.parametrize("event_type", ["plan_version", "plan_feedback", "episode_end"])
+def test_audit_rejects_removed_alternatives_outside_proposals(event_type) -> None:
+    from dataclasses import replace
+
+    result = _stale_alternative_revision()
+    log = list(result.log)
+    index = next(i for i, e in enumerate(log) if e.event_type == event_type)
+    pair = {"job_id": "job_a", "option_id": "short"}
+    log[index] = replace(
+        log[index], detail={**(log[index].detail or {}), "removed_alternatives": [pair]}
+    )
+    report = audit_episode(result.metadata, log)
+    assert any("outside an accepted proposal" in issue for issue in report.issues)
+
+
 def test_audit_reports_removals_for_receipt_checks() -> None:
     result = _stale_alternative_revision()
     report = audit_episode(result.metadata, result.log)

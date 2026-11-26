@@ -670,6 +670,12 @@ def audit_episode(
     endings = 0
     for index, entry in enumerate(log):
         where = f"seq {entry.seq} ({entry.event_type})"
+        if (
+            isinstance(entry.detail, dict)
+            and "removed_alternatives" in entry.detail
+            and (entry.event_type, entry.result) != ("propose_plan", "ok")
+        ):
+            issues.append(f"{where}: removed alternatives outside an accepted proposal")
         plans.require_pending_release(entry, where)
         schedule.observe(entry, where)
         if entry.seq != index:
