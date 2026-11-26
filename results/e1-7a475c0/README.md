@@ -1,6 +1,6 @@
 # E1 - dev, all 16 variants, DeepSeek, final configuration
 
-640 episodes on `deepseek-v4-1-flash-1017`: 10 baselines (`U|A` x `N F R1 R3 R3P`) and 6 structured variants (`A/S A/S+V A/S+G A/VBC A/VBC-r0 A/VBC-r2`) x 10 `dev` profiles x 4 repeats, all on one commit. This is the E1 of record for DeepSeek; `results/e1-9e36e07` and `results/e1g-7e0316c` are earlier configurations (see `docs/decisions.md`).
+640 episodes on `deepseek-v4-1-flash-1017`: 10 baselines (`U|A` x `N F R1 R3 R3P`) and 6 structured variants (`A/S A/S+V A/S+G A/VBC A/VBC-r0 A/VBC-r2`) x 10 `dev` profiles x 4 repeats, all on one commit. This is the E1 of record for DeepSeek together with `results/e1-uvbc-09135ca` (the 17th variant, `U/VBC`, added later); `results/e1-9e36e07` and `results/e1g-7e0316c` are earlier configurations (see `docs/decisions.md`).
 
 Setup (`deepseek-v4-1-flash-1017/run_manifest.json`): code `7a475c0` on `master`, clean tree, prompt `phases-6-vbc`, protocol `vbc-2`; Mistral API, `temperature=0.3`, `max_tokens=2048`, `reasoning_effort="none"`, `llm_seed` sent as `random_seed`, history not truncated; 30 parallel episodes; run on 2026-11-25. A 16-episode preflight (all variants on `dev_s3_01`, repeat 0) passed before the run.
 
