@@ -235,7 +235,7 @@ class Environment:
             variant=self.variant.value,
             preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
             execution_turn_limit=min(12, self.scenario.agent_turn_limit),
-            protocol_version="vbc-4" if self.variant.structured else "baseline-phases-1",
+            protocol_version="vbc-5" if self.variant.structured else "baseline-phases-1",
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -719,7 +719,7 @@ class Environment:
                 {"reason": error},
                 data={"error": PLAN_ERROR_TEXT[error]},
             )
-        # A chosen option is not an alternative of its own (vbc-4): drop it instead of refusing
+        # A chosen option is not an alternative of its own (from vbc-4): drop it instead of refusing
         # the whole proposal, which used to cost the agent its revision.
         chosen = set(action.items)
         removed = [pair for pair in action.disclosed_alternatives if pair in chosen]

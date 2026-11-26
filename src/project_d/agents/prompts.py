@@ -64,13 +64,6 @@ GUARD_RULE = (
     "план не входят. Без подтверждения обоими агентами ограничения нет."
 )
 
-# Neutral facts about confirming (vbc-4), shown in the confirmation phase of every S variant.
-CONFIRM_FACTS = (
-    "Полную итоговую версию можно подтвердить даже при превышении бюджета. Подтверждение не "
-    "подаёт заявки и не резервирует кредиты. Превышение суммы само по себе не гарантирует "
-    "отказа при подаче."
-)
-
 
 def plan_mechanics(other_agent: str) -> str:
     """Interface of the structured protocol, identical for every V, G and round count."""
@@ -170,8 +163,7 @@ def protocol_note(
                 f"Фаза подтверждения. Окончательная версия плана: {version}. "
                 f"Если готов выполнять её, вызови confirm_plan с plan_version={version}. "
                 "Если не согласен, не подтверждай: "
-                "вызови wait_until(40). "
-                f"{CONFIRM_FACTS}"
+                "вызови wait_until(40)."
             )
     return "".join(f"{part}\n" for part in parts)
 

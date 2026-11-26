@@ -36,12 +36,16 @@ class AuditReport:
     agreement: str | None = None
     plan_mismatches: int = 0
     tool_statuses: dict[tuple[str, int], str] = field(default_factory=dict)
-    # vbc-4: alternatives dropped from an accepted proposal, by (agent, time).
+    # From vbc-4: alternatives dropped from an accepted proposal, by (agent, time).
     removed_alternatives: dict[tuple[str, int], list[dict[str, str]]] = field(default_factory=dict)
 
     @property
     def consistent(self) -> bool:
         return not self.issues
+
+
+# Protocol versions in which propose_plan drops chosen options from the alternatives.
+NORMALIZING_VERSIONS = ("vbc-4", "vbc-5")
 
 
 def _catalog_option(metadata: EpisodeMetadata, entry: LogEntry) -> dict[str, int] | None:
@@ -367,11 +371,11 @@ class _PlanAudit:
         ):
             self.issues.append(f"{where}: repeated job or alternative in proposal")
             return
-        # Only vbc-4 drops chosen options from the alternatives; it logs a nonempty list of
-        # distinct chosen pairs, the same list it returned to the agent.
+        # Only NORMALIZING_VERSIONS drop chosen options from the alternatives; they log a
+        # nonempty list of distinct chosen pairs, the same list returned to the agent.
         if has_removed:
             well_formed = (
-                self.metadata.protocol_version == "vbc-4"
+                self.metadata.protocol_version in NORMALIZING_VERSIONS
                 and isinstance(removed, list)
                 and bool(removed)
                 and all(

@@ -38,15 +38,11 @@ def test_confirm_note_names_final_version_and_how_to_decline() -> None:
     assert "wait_until(40)" in note
 
 
-def test_confirm_note_states_neutral_facts_identical_for_u_and_a() -> None:
-    from project_d.agents.prompts import CONFIRM_FACTS
-
+def test_confirm_note_does_not_invite_over_budget_confirmation() -> None:
+    """vbc-5: the vbc-4 'confirm even over budget' facts raised over-budget confirmations."""
     note = protocol_note("confirm", (), PLAN, "B")
-    assert CONFIRM_FACTS in note
-    assert "можно подтвердить даже при превышении бюджета" in CONFIRM_FACTS
-    assert "не гарантирует отказа" in CONFIRM_FACTS
-    # The note has no execution argument, so U and A receive the same text by construction.
-    assert CONFIRM_FACTS not in protocol_note("confirm", (), None, "B")
+    assert "превышени" not in note
+    assert "не резервирует" not in note
 
 
 def test_guard_rule_names_its_scope_and_absence_without_agreement() -> None:
