@@ -20,6 +20,7 @@ from project_d.environment.actions import (
     SubmitJob,
     ToolStatus,
 )
+from project_d.environment.env import PLAN_ERROR_TEXT, Environment
 from project_d.environment.model import (
     CONFIRM_TIME,
     PROPOSE_TIMES,
@@ -162,6 +163,21 @@ def test_proposal_format_errors_are_refused(plan, reason) -> None:
     refusal = _events(result, "propose_plan")[0]
     assert (refusal.result, refusal.detail["reason"]) == ("invalid_plan", reason)
     assert _events(result, "plan_version")[0].detail["proposals"] == {}
+    (call,) = [c for c in result.calls if isinstance(c.action, ProposePlan)]
+    assert call.result.data == {"error": PLAN_ERROR_TEXT[reason]}
+
+
+def test_rejected_revision_tells_the_agent_why_without_revealing_foreign_jobs() -> None:
+    """A switch to an option still listed as an alternative is refused with its reason."""
+    env = Environment(_scenario(), RunConfig.for_protocol("A/VBC"))
+    env._now = 33
+    switched = env.execute("A", ProposePlan((A_SHORT,), (A_SHORT, A_MINI)))
+    assert switched.status is ToolStatus.INVALID_PLAN
+    assert "невыбранные" in switched.data["error"]
+    foreign = env.execute("A", ProposePlan((B_STANDARD,)))
+    unknown = env.execute("A", ProposePlan((("job_x", "full"),)))
+    assert foreign.data == unknown.data == {"error": PLAN_ERROR_TEXT["unknown_job"]}
+    assert env.execute("A", ProposePlan((A_SHORT,), (A_FULL, A_MINI))).status is ToolStatus.OK
 
 
 @pytest.mark.parametrize("variant", ["A/S", "A/S+V"])

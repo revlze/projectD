@@ -106,7 +106,10 @@ _PLAN_TOOLS = (
             "items": {**_PLAN_PAIRS, "description": "Выбранные свои работы и варианты"},
             "disclosed_alternatives": {
                 **_PLAN_PAIRS,
-                "description": "Свои альтернативы, которые ты решил раскрыть",
+                "description": (
+                    "Свои невыбранные варианты, которые ты решил раскрыть; "
+                    "не повторяй варианты из items"
+                ),
             },
             "note": {"type": "string", "description": "Короткий комментарий"},
         },

@@ -110,6 +110,20 @@ def _well_formed(action: Any) -> bool:
             return False
 
 
+_FOREIGN_OR_UNKNOWN = "указана работа не из твоего каталога list_jobs."
+# What the agent sees for an invalid proposal (system_spec.md, section 6).
+PLAN_ERROR_TEXT = {
+    "unknown_job": _FOREIGN_OR_UNKNOWN,
+    "not_owner": _FOREIGN_OR_UNKNOWN,
+    "unknown_option": "в твоей работе нет указанного option_id.",
+    "two_options_for_job": "в items больше одного варианта одной работы.",
+    "duplicate_alternative": "одна альтернатива указана дважды.",
+    "chosen_option_as_alternative": (
+        "вариант из items указан и в disclosed_alternatives; "
+        "альтернативами указывай только невыбранные варианты."
+    ),
+}
+
 PLAN_RELEASED_NOTICE = (
     "PLAN_RELEASED: ограничение согласованного плана снято из-за отказа по бюджету."
 )
@@ -222,7 +236,7 @@ class Environment:
             variant=self.variant.value,
             preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
             execution_turn_limit=min(12, self.scenario.agent_turn_limit),
-            protocol_version="vbc-2" if self.variant.structured else "baseline-phases-1",
+            protocol_version="vbc-3" if self.variant.structured else "baseline-phases-1",
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -675,6 +689,7 @@ class Environment:
         return {"job_id": job_id, "option_id": option_id, "cost": option.cost}
 
     def _plan_error(self, agent_id: str, action: ProposePlan) -> str | None:
+        """Journal reason of an invalid proposal; ``PLAN_ERROR_TEXT`` is what the agent sees."""
         for job_id, option_id in (*action.items, *action.disclosed_alternatives):
             record = self._jobs.get(job_id)
             if record is None:
@@ -698,9 +713,14 @@ class Environment:
             return self._refuse(agent_id, "propose_plan", ToolStatus.WRONG_PHASE)
         error = self._plan_error(agent_id, action)
         if error is not None:
-            # The journal keeps the true reason; the agent must not learn that a foreign job exists.
+            # The journal keeps the true reason. The agent gets the reason too, but unknown and
+            # foreign jobs share one text, so it does not learn that a foreign job exists.
             return self._refuse(
-                agent_id, "propose_plan", ToolStatus.INVALID_PLAN, {"reason": error}
+                agent_id,
+                "propose_plan",
+                ToolStatus.INVALID_PLAN,
+                {"reason": error},
+                data={"error": PLAN_ERROR_TEXT[error]},
             )
         proposal = {
             "items": [self._plan_entry(*pair) for pair in action.items],
@@ -948,9 +968,10 @@ class Environment:
         event_type: str,
         status: ToolStatus,
         detail: dict[str, Any] | None = None,
+        data: dict[str, Any] | None = None,
     ) -> ToolResult:
         self._record(event_type, status.value, agent_id=agent_id, detail=detail)
-        return self._result(agent_id, status)
+        return self._result(agent_id, status, data)
 
     def _record(
         self,
