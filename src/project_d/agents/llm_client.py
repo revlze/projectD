@@ -193,9 +193,7 @@ class OpenAICompatibleClient:
                     )
                     detail = exc.read().decode("utf-8", errors="replace")
                     print(f"HTTP {exc.code}: {detail}")
-                    raise LLMTransportError(
-                        f"HTTP {exc.code}: {detail}", trace()
-                    ) from exc
+                    raise LLMTransportError(f"HTTP {exc.code}: {detail}", trace()) from exc
                 outcome, cause = "http_error", exc
             except LLMTransportError as exc:
                 attempts.append(
