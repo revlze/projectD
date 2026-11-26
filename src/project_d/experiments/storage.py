@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
 import os
 import platform
@@ -53,6 +54,78 @@ class SavedEpisode:
     turns: list[TurnRecord]
     prompt_version: str
     summary: dict[str, Any]
+
+
+def _calls(message: dict[str, Any]) -> list[tuple[str, str]]:
+    return [
+        (call["function"]["name"], call["function"]["arguments"])
+        for call in message.get("tool_calls") or []
+    ]
+
+
+def _expected_removed(turn: TurnRecord) -> list[dict[str, str]] | None:
+    """Alternatives an accepted proposal must drop, rebuilt from the model's own call."""
+    calls = _calls(turn.message)
+    # Only the first call is executed; extra calls are dropped or make the action invalid.
+    if not calls or calls[0][0] != "propose_plan" or turn.tool_result["status"] != "ok":
+        return None
+    arguments = json.loads(calls[0][1])
+    chosen = {(item["job_id"], item["option_id"]) for item in arguments.get("items", [])}
+    removed = [
+        {"job_id": item["job_id"], "option_id": item["option_id"]}
+        for item in arguments.get("disclosed_alternatives") or []
+        if (item["job_id"], item["option_id"]) in chosen
+    ]
+    return removed or None
+
+
+def _check_shown_results(name: str, turns: list[TurnRecord]) -> None:
+    """The next request of each agent must show exactly the recorded reply and tool result."""
+    by_agent: dict[str, list[TurnRecord]] = {}
+    for turn in turns:
+        by_agent.setdefault(turn.agent_id, []).append(turn)
+    for agent_turns in by_agent.values():
+        agent_turns.sort(key=lambda turn: turn.logical_time)
+        for turn in agent_turns:
+            try:
+                expected_removed = _expected_removed(turn)
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise ValueError(f"{name}: unreadable proposal call") from exc
+            if turn.tool_result["data"].get("removed_alternatives") != expected_removed:
+                raise ValueError(f"{name}: removed alternatives differ from the proposal call")
+        for previous, current in itertools.pairwise(agent_turns):
+            before = previous.request["messages"]
+            after = current.request["messages"]
+            if after[: len(before)] != before or len(after) < len(before) + 3:
+                raise ValueError(f"{name}: request history is not a continuation")
+            reply, *shown, _observation = after[len(before) :]
+            result = previous.tool_result
+            payload = {
+                "status": result["status"],
+                "logical_time": result["logical_time"],
+                "submission_open_at": result["submission_open_at"],
+                **result["data"],
+            }
+            if (
+                reply.get("role") != "assistant"
+                or (reply.get("content") or "") != (previous.message.get("content") or "")
+                or _calls(reply) != _calls(previous.message)
+            ):
+                raise ValueError(f"{name}: request history differs from the recorded reply")
+            for message in shown:
+                try:
+                    content = json.loads(message["content"])
+                except (KeyError, TypeError, ValueError) as exc:
+                    raise ValueError(f"{name}: unreadable tool result in history") from exc
+                # A parse error replaces "error" in the rendered result; otherwise it is exact.
+                ignored = {"error"} if previous.parse_error else set()
+                if (
+                    message.get("role") not in ("tool", "user")
+                    or not isinstance(content, dict)
+                    or {k: v for k, v in content.items() if k not in ignored}
+                    != {k: v for k, v in payload.items() if k not in ignored}
+                ):
+                    raise ValueError(f"{name}: shown tool result differs from the record")
 
 
 class RunStore:
@@ -147,7 +220,8 @@ class RunStore:
             if (
                 not request
                 or digest != turn.request_sha256
-                or turn.tool_result is None
+                or not isinstance(turn.tool_result, dict)
+                or not isinstance(turn.tool_result.get("data", {}), dict)
                 or turn.tool_result.get("logical_time") != turn.logical_time
                 or turn.tool_result.get("status")
                 != report.tool_statuses[turn.agent_id, turn.logical_time]
@@ -186,6 +260,7 @@ class RunStore:
                 raise ValueError(f"{name}: request observation differs from the decision")
             if fingerprint(request["tools"]) != expected["tools_sha256"][phase]:
                 raise ValueError(f"{name}: request tools differ from the manifest")
+        _check_shown_results(name, turns)
         return SavedEpisode(metadata, log, turns, prompts["version"], summary)
 
     def complete(self, name: str, summary: dict[str, Any]) -> None:

@@ -177,6 +177,118 @@ def test_resume_rejects_removed_alternatives_missing_from_the_journal(tmp_path):
         run(tmp_path, spec=spec)
 
 
+VBC_SPEC = EpisodeSpec("E1", "dev/dev_s2_01.json", "A/VBC", 0)
+
+
+class StaleAlternativeClient(RecordingClient):
+    """Proposes its chosen option also as an alternative, so every proposal is normalized."""
+
+    def chat(self, messages, tools):
+        reply = super().chat(messages, tools)
+        call = reply.message["tool_calls"][0]["function"]
+        if call["name"] == "propose_plan":
+            arguments = json.loads(call["arguments"])
+            arguments["disclosed_alternatives"] = list(arguments["items"])
+            call["arguments"] = json.dumps(arguments)
+        return reply
+
+
+def _rewrite_turns(root: Path, spec: EpisodeSpec, change) -> None:
+    from project_d.agents.prompts import prompt_sha256
+
+    path = root / f"{spec.name}.llm.jsonl"
+    turns = [json.loads(line) for line in path.read_bytes().splitlines()]
+    change(turns)
+    for turn in turns:
+        turn["request_sha256"] = prompt_sha256(
+            json.dumps(turn["request"], ensure_ascii=False, sort_keys=True)
+        )
+    path.write_text("".join(json.dumps(turn) + "\n" for turn in turns), encoding="utf-8")
+    _update_receipt(root, "llm.jsonl", path, spec)
+
+
+def _normalized_run(root: Path) -> None:
+    run(root, spec=VBC_SPEC, client=StaleAlternativeClient())
+
+
+def test_normalized_run_is_reused_on_resume(tmp_path):
+    _normalized_run(tmp_path)
+    turns = [
+        json.loads(line)
+        for line in (tmp_path / f"{VBC_SPEC.name}.llm.jsonl").read_bytes().splitlines()
+    ]
+    assert any(t["tool_result"]["data"].get("removed_alternatives") for t in turns)
+    rows = run(tmp_path, spec=VBC_SPEC, client=StaleAlternativeClient())
+    assert len(rows) == 1
+
+
+def test_resume_rejects_history_without_the_shown_removal(tmp_path):
+    _normalized_run(tmp_path)
+
+    def drop_from_history(turns):
+        for turn in turns:
+            for message in turn["request"]["messages"]:
+                if message["role"] == "tool" and "removed_alternatives" in message["content"]:
+                    content = json.loads(message["content"])
+                    del content["removed_alternatives"]
+                    message["content"] = json.dumps(content, ensure_ascii=False)
+
+    _rewrite_turns(tmp_path, VBC_SPEC, drop_from_history)
+    with pytest.raises(ValueError, match="shown tool result differs from the record"):
+        _normalized_run(tmp_path)
+
+
+def test_resume_rejects_a_removal_the_model_did_not_request(tmp_path):
+    """A consistent journal and tool result still must follow from the model's own call."""
+    run(tmp_path, spec=VBC_SPEC)
+    log_path = tmp_path / f"{VBC_SPEC.name}.log.jsonl"
+    raw = [json.loads(line) for line in log_path.read_bytes().splitlines()]
+    entry = next(e for e in raw[1:] if e.get("event_type") == "propose_plan")
+    chosen = entry["detail"]["items"][0]
+    pair = {"job_id": chosen["job_id"], "option_id": chosen["option_id"]}
+    entry["detail"]["removed_alternatives"] = [pair]
+    log_path.write_bytes("".join(json.dumps(item) + "\n" for item in raw).encode("utf-8"))
+    _update_receipt(tmp_path, "log.jsonl", log_path, VBC_SPEC)
+
+    def add_to_result(turns):
+        turn = next(
+            t
+            for t in turns
+            if t["agent_id"] == entry["agent_id"] and t["logical_time"] == entry["time"]
+        )
+        turn["tool_result"]["data"]["removed_alternatives"] = [pair]
+
+    _rewrite_turns(tmp_path, VBC_SPEC, add_to_result)
+    with pytest.raises(ValueError, match="removed alternatives differ from the proposal call"):
+        run(tmp_path, spec=VBC_SPEC)
+
+
+def _list_as_data(turns):
+    turns[0]["tool_result"]["data"] = [1]
+
+
+def _replace_reply(turns):
+    """Change the assistant reply that the agent's second request carries in its history."""
+    agent = turns[0]["agent_id"]
+    first, second = [t for t in turns if t["agent_id"] == agent][:2]
+    reply = second["request"]["messages"][len(first["request"]["messages"])]
+    reply["content"] = "rewritten"
+
+
+@pytest.mark.parametrize(
+    ("change", "error"),
+    [
+        (_list_as_data, "incomplete request or tool outcome"),
+        (_replace_reply, "request history differs from the recorded reply"),
+    ],
+)
+def test_resume_rejects_malformed_or_rewritten_history(tmp_path, change, error):
+    run(tmp_path)
+    _rewrite_turns(tmp_path, SPEC, change)
+    with pytest.raises(ValueError, match=error):
+        run(tmp_path)
+
+
 def test_independent_audit_rejects_damaged_journal_even_with_updated_checksum(tmp_path):
     run(tmp_path)
     path = tmp_path / f"{SPEC.name}.log.jsonl"
