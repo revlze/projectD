@@ -7,6 +7,7 @@ Every run manifest and protocol version is reported separately.
 
 from __future__ import annotations
 
+import argparse
 import csv
 import hashlib
 import json
@@ -29,24 +30,30 @@ def _scenario(scenario_id: str):
 
 
 def main(argv: list[str]) -> int:
-    if not argv:
-        print(__doc__, file=sys.stderr)
-        return 2
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("runs", nargs="+", type=Path)
+    parser.add_argument("--out", type=Path, help="Write the aggregate CSV instead of stdout")
+    parser.add_argument("--timings-out", type=Path, help="Write the per-episode submission times")
+    args = parser.parse_args(argv)
     journals: set[Path] = set()
-    for root in map(Path, argv):
+    for root in args.runs:
         found = {*root.glob("*.log.jsonl"), *root.glob("*/*.log.jsonl")}
         if not found:
             raise ValueError(f"{root}: no episode journals")
         journals.update(path.resolve() for path in found)
     sources: dict[Path, tuple[str, ...]] = {}
     table: dict[tuple[str, ...], Counter[str]] = defaultdict(Counter)
+    timings = []
     for path in sorted(journals):
         if path.parent not in sources:
             manifest = (path.parent / "run_manifest.json").read_bytes()
             saved = json.loads(manifest)
             runtime = saved.get("runtime", saved)
+            run_path = path.parent
+            if run_path.is_relative_to(Path.cwd()):
+                run_path = run_path.relative_to(Path.cwd())
             sources[path.parent] = (
-                str(path.parent),
+                run_path.as_posix(),
                 runtime["llm"]["model"],
                 runtime.get("git_commit") or "",
                 runtime.get("prompt_version") or "",
@@ -72,6 +79,24 @@ def main(argv: list[str]) -> int:
         ]
         cell["episodes"] += 1
         cell.update(result.outcomes.values())
+        first = result.first_submissions or {}
+        time_gap = max(first.values()) - min(first.values()) if len(first) == 2 else None
+        cell["both_submitted"] += time_gap is not None
+        cell["staggered_submissions"] += time_gap is not None and time_gap > 0
+        if args.timings_out:
+            timings.append(
+                (
+                    sources[path.parent][2],
+                    path.name.removesuffix(".log.jsonl"),
+                    metadata.scenario_id,
+                    metadata.variant or metadata.mode,
+                    metadata.first_agent,
+                    metadata.role_swap,
+                    first.get("A"),
+                    first.get("B"),
+                    time_gap,
+                )
+            )
         cell[f"{sum(v == 'completed' for v in result.outcomes.values())}_completed"] += 1
         if result.higher_value_root_completed is not None:
             cell["decided"] += 1
@@ -84,9 +109,10 @@ def main(argv: list[str]) -> int:
         "2_completed",
         "higher_value_root_completed",
         "decided",
+        "both_submitted",
+        "staggered_submissions",
     )
-    writer = csv.writer(sys.stdout, lineterminator="\n")
-    writer.writerow(
+    aggregate = [
         (
             "run",
             "model",
@@ -96,11 +122,39 @@ def main(argv: list[str]) -> int:
             "protocol_version",
             "variant",
             *fields,
-        )
-    )
+        ),
+    ]
     for source, counts in sorted(table.items()):
-        writer.writerow((*source, *(counts[field] for field in fields)))
+        aggregate.append((*source, *(counts[field] for field in fields)))
+    _write_csv(args.out, aggregate)
+    if args.timings_out:
+        _write_csv(
+            args.timings_out,
+            [
+                (
+                    "commit",
+                    "episode",
+                    "profile",
+                    "variant",
+                    "first_agent",
+                    "role_swap",
+                    "first_root_submit_A",
+                    "first_root_submit_B",
+                    "absolute_gap",
+                ),
+                *timings,
+            ],
+        )
     return 0
+
+
+def _write_csv(path, rows) -> None:
+    if path is None:
+        csv.writer(sys.stdout, lineterminator="\n").writerows(rows)
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        csv.writer(handle, lineterminator="\n").writerows(rows)
 
 
 if __name__ == "__main__":

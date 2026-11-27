@@ -315,6 +315,7 @@ class RootConflict:
     conflict: bool
     outcomes: dict[str, str] | None = None
     higher_value_root_completed: bool | None = None
+    first_submissions: dict[str, int] | None = None
 
 
 def root_conflict(
@@ -326,6 +327,7 @@ def root_conflict(
     if cheapest <= metadata.budget:
         return RootConflict(False)
     outcomes = dict.fromkeys(roots, "not_submitted")
+    first_submissions: dict[str, int] = {}
     priority = (
         "not_submitted",
         "other_refusal",
@@ -341,6 +343,7 @@ def root_conflict(
         if entry.job_id != job.job_id:
             continue
         if entry.event_type == "submit":
+            first_submissions[owner] = min(entry.time, first_submissions.get(owner, entry.time))
             outcome = {
                 ToolStatus.ACCEPTED: "accepted_incomplete",
                 ToolStatus.INSUFFICIENT_BUDGET: "budget_refused",
@@ -360,4 +363,4 @@ def root_conflict(
     higher_completed = None
     if len(done) == 1 and len(set(value.values())) > 1:
         higher_completed = value[done[0]] == max(value.values())
-    return RootConflict(True, outcomes, higher_completed)
+    return RootConflict(True, outcomes, higher_completed, first_submissions)

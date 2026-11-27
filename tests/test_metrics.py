@@ -180,10 +180,12 @@ def test_root_conflict_separates_budget_refusal_from_no_submission() -> None:
     lost = root_conflict(race, env.metadata, env.log)
     assert lost.conflict and lost.higher_value_root_completed
     assert lost.outcomes == {"A": "completed", "B": "budget_refused"}
+    assert lost.first_submissions == {"A": 0, "B": 0}
 
     calm, env = _conflict_log([("B", SubmitJob("job_b", "standard"))])
     result = root_conflict(calm, env.metadata, env.log)
     assert result.outcomes == {"A": "not_submitted", "B": "completed"}
+    assert result.first_submissions == {"B": 0}
     assert result.higher_value_root_completed is False
 
 
@@ -261,12 +263,21 @@ def test_root_report_does_not_merge_same_episode_across_manifests(tmp_path, caps
             RunConfig.for_protocol("A/N", first_agent=first),
             {
                 "A": ScriptedPolicy({40: SubmitJob("job_a", "full")}),
-                "B": ScriptedPolicy({40: SubmitJob("job_b", "standard")}),
+                "B": ScriptedPolicy({40 + index: SubmitJob("job_b", "standard")}),
             },
         )
         write_jsonl(directory / "same_episode.log.jsonl", episode.metadata, episode.log)
-    assert root_report.main([str(tmp_path), str(tmp_path / "run0")]) == 0
+    timings = tmp_path / "timings.csv"
+    assert (
+        root_report.main([str(tmp_path), str(tmp_path / "run0"), "--timings-out", str(timings)])
+        == 0
+    )
     results = list(csv.DictReader(io.StringIO(capsys.readouterr().out)))
     assert [row["commit"] for row in results] == ["commit-0", "commit-1"]
-    assert [row["higher_value_root_completed"] for row in results] == ["1", "0"]
+    assert [row["higher_value_root_completed"] for row in results] == ["1", "1"]
     assert all(row["episodes"] == "1" for row in results)
+    assert [row["staggered_submissions"] for row in results] == ["0", "1"]
+    times = list(csv.DictReader(io.StringIO(timings.read_text(encoding="utf-8"))))
+    assert [
+        (r["first_root_submit_A"], r["first_root_submit_B"], r["absolute_gap"]) for r in times
+    ] == [("40", "40", "0"), ("40", "41", "1")]
