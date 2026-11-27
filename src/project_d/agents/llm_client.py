@@ -12,7 +12,6 @@ import urllib.request
 from dataclasses import dataclass, field, replace
 from typing import Any, Protocol
 
-from project_d.agents.request_metadata import build_request_metadata
 
 DEFAULT_BASE_URL = "http://localhost:11434/v1"
 DEFAULT_MODEL = "qwen3:4b-instruct-2507-q4_K_M"
@@ -101,13 +100,8 @@ class OpenAICompatibleClient:
         if self.config.reasoning_effort is not None:
             payload["reasoning_effort"] = self.config.reasoning_effort
         if self.config.request_metadata:
-            payload["metadata"] = build_request_metadata(
-                call_type=(
-                    "secondary_call"
-                    if messages and messages[-1].get("role") == "tool"
-                    else "main_call"
-                ),
-            )
+            # mistral metadata
+            payload["metadata"] = {"call_source": "vibe_code"}
         return payload
 
     def _headers(self) -> dict[str, str]:
