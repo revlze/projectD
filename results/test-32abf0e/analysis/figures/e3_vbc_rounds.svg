@@ -1,0 +1,71 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='960' height='291' viewBox='0 0 960 291' role='img'>
+<title>E3 VBC message rounds</title>
+<rect width='960' height='291' fill='#ffffff'/>
+<text x='16.0' y='24.0' font-size='16' text-anchor='start' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>E3 VBC message rounds</text>
+<text x='16.0' y='44.0' font-size='11' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>12 matched profiles x 4 repeats | One plan revision in every variant</text>
+<text x='182.5' y='65.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>Mean U_safe/U*</text>
+<line x1='60.0' y1='246.0' x2='305.0' y2='246.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='53.0' y='250.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0.75</text>
+<line x1='60.0' y1='205.0' x2='305.0' y2='205.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='53.0' y='209.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0.81</text>
+<line x1='60.0' y1='164.0' x2='305.0' y2='164.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='53.0' y='168.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0.88</text>
+<line x1='60.0' y1='123.0' x2='305.0' y2='123.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='53.0' y='127.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0.94</text>
+<line x1='60.0' y1='82.0' x2='305.0' y2='82.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='53.0' y='86.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>1.00</text>
+<text x='100.8' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0</text>
+<text x='182.5' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>1</text>
+<text x='264.2' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>2</text>
+<line x1='100.8' y1='164.0' x2='182.5' y2='148.3' stroke='#f47230' stroke-width='2'/>
+<line x1='182.5' y1='148.3' x2='264.2' y2='136.9' stroke='#f47230' stroke-width='2'/>
+<circle cx='100.8' cy='164.0' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<circle cx='182.5' cy='148.3' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<circle cx='264.2' cy='136.9' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<text x='492.5' y='65.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>Share of episodes with agreement</text>
+<line x1='370.0' y1='246.0' x2='615.0' y2='246.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='363.0' y='250.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0%</text>
+<line x1='370.0' y1='205.0' x2='615.0' y2='205.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='363.0' y='209.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>25%</text>
+<line x1='370.0' y1='164.0' x2='615.0' y2='164.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='363.0' y='168.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>50%</text>
+<line x1='370.0' y1='123.0' x2='615.0' y2='123.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='363.0' y='127.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>75%</text>
+<line x1='370.0' y1='82.0' x2='615.0' y2='82.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='363.0' y='86.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>100%</text>
+<text x='410.8' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0</text>
+<text x='492.5' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>1</text>
+<text x='574.2' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>2</text>
+<line x1='410.8' y1='177.7' x2='492.5' y2='146.9' stroke='#f47230' stroke-width='2'/>
+<line x1='492.5' y1='146.9' x2='574.2' y2='99.1' stroke='#f47230' stroke-width='2'/>
+<circle cx='410.8' cy='177.7' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<circle cx='492.5' cy='146.9' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<circle cx='574.2' cy='99.1' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<text x='582.2' y='103.1' font-size='10' text-anchor='start' fill='#f47230' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>All</text>
+<line x1='410.8' y1='218.7' x2='492.5' y2='194.8' stroke='#107b68' stroke-width='2'/>
+<line x1='492.5' y1='194.8' x2='574.2' y2='157.2' stroke='#107b68' stroke-width='2'/>
+<circle cx='410.8' cy='218.7' r='4.5' fill='#107b68' stroke='#ffffff' stroke-width='2'/>
+<circle cx='492.5' cy='194.8' r='4.5' fill='#107b68' stroke='#ffffff' stroke-width='2'/>
+<circle cx='574.2' cy='157.2' r='4.5' fill='#107b68' stroke='#ffffff' stroke-width='2'/>
+<text x='582.2' y='161.2' font-size='10' text-anchor='start' fill='#107b68' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>Within budget</text>
+<text x='826.0' y='65.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>Mean total tokens (thousands)</text>
+<line x1='714.0' y1='246.0' x2='938.0' y2='246.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='707.0' y='250.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0</text>
+<line x1='714.0' y1='205.0' x2='938.0' y2='205.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='707.0' y='209.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>35</text>
+<line x1='714.0' y1='164.0' x2='938.0' y2='164.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='707.0' y='168.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>70</text>
+<line x1='714.0' y1='123.0' x2='938.0' y2='123.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='707.0' y='127.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>105</text>
+<line x1='714.0' y1='82.0' x2='938.0' y2='82.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='707.0' y='86.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>140</text>
+<text x='751.3' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0</text>
+<text x='826.0' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>1</text>
+<text x='900.7' y='263.0' font-size='11' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>2</text>
+<line x1='751.3' y1='125.0' x2='826.0' y2='107.2' stroke='#f47230' stroke-width='2'/>
+<line x1='826.0' y1='107.2' x2='900.7' y2='89.3' stroke='#f47230' stroke-width='2'/>
+<circle cx='751.3' cy='125.0' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<circle cx='826.0' cy='107.2' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<circle cx='900.7' cy='89.3' r='4.5' fill='#f47230' stroke='#ffffff' stroke-width='2'/>
+<text x='480.0' y='283.0' font-size='11' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>Assigned message rounds</text>
+</svg>
