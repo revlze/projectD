@@ -1,0 +1,8 @@
+# Generated TLC files (not research results)
+states/
+.tlc/
+*.out
+*_TTrace_*.tla
+*_TTrace_*.cfg
+*_trace_*.tlc
+__pycache__/
