@@ -1,0 +1,379 @@
+@!@!@STARTMSG 2262:0 @!@!@
+TLC2 Version 2026.11.26.020825 (rev: 1138302)
+@!@!@ENDMSG 2262 @!@!@
+@!@!@STARTMSG 2187:0 @!@!@
+Running breadth-first search Model-Checking with fp 53 and seed 6876979402303731435 with 1 worker on 12 cores with 3580MB heap and 64MB offheap memory [pid: 23276] (Windows 11 10.0 amd64, Eclipse Adoptium 21.0.13.1 64bit, MSBDiskFPSet, DiskStateQueue).
+@!@!@ENDMSG 2187 @!@!@
+@!@!@STARTMSG 2220:0 @!@!@
+Starting SANY...
+@!@!@ENDMSG 2220 @!@!@
+Parsing file C:\Users\peret\Desktop\Third year\Agents\project\projectD\formal\tla\budget\SafeBudget.tla (file:/c:/Users/peret/Desktop/Third%20year/Agents/project/projectD/formal/tla/budget/SafeBudget.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\Integers.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/Integers.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\_TLCTrace.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/_TLCTrace.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\Naturals.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\TLC.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\TLCExt.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/TLCExt.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\Sequences.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-11862853182001946934\FiniteSets.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/tools/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Semantic processing of module Naturals
+Semantic processing of module Integers
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module TLCExt
+Semantic processing of module _TLCTrace
+Semantic processing of module SafeBudget
+Linting of module TLCExt
+Linting of module _TLCTrace
+Linting of module SafeBudget
+@!@!@STARTMSG 2219:0 @!@!@
+SANY finished.
+@!@!@ENDMSG 2219 @!@!@
+@!@!@STARTMSG 2185:0 @!@!@
+Starting... (2026-11-27 21:29:06)
+@!@!@ENDMSG 2185 @!@!@
+@!@!@STARTMSG 2189:0 @!@!@
+Computing initial states...
+@!@!@ENDMSG 2189 @!@!@
+@!@!@STARTMSG 2190:0 @!@!@
+Finished computing initial states: 1 distinct state generated at 2026-11-27 21:29:06.
+@!@!@ENDMSG 2190 @!@!@
+@!@!@STARTMSG 2193:0 @!@!@
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 2.0E-18
+@!@!@ENDMSG 2193 @!@!@
+@!@!@STARTMSG 2201:0 @!@!@
+The coverage statistics at 2026-11-27 21:29:06 (see https://explain.tlapl.us/module-coverage-statistics for how to interpret the following statistics).
+@!@!@ENDMSG 2201 @!@!@
+@!@!@STARTMSG 2779:0 @!@!@
+<spent line 16, col 11 to line 16, col 15 of module SafeBudget>: 3
+@!@!@ENDMSG 2779 @!@!@
+@!@!@STARTMSG 2779:0 @!@!@
+<held line 16, col 18 to line 16, col 21 of module SafeBudget>: 3
+@!@!@ENDMSG 2779 @!@!@
+@!@!@STARTMSG 2779:0 @!@!@
+<phase line 16, col 24 to line 16, col 28 of module SafeBudget>: 8
+@!@!@ENDMSG 2779 @!@!@
+@!@!@STARTMSG 2773:0 @!@!@
+<Init line 22, col 1 to line 22, col 4 of module SafeBudget>: 1:1
+@!@!@ENDMSG 2773 @!@!@
+@!@!@STARTMSG 2775:0 @!@!@
+  line 23, col 12 to line 23, col 20 of module SafeBudget: 1:1
+@!@!@ENDMSG 2775 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 24, col 12 to line 24, col 49 of module SafeBudget: 1
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2775:0 @!@!@
+  |line 24, col 20 to line 24, col 49 of module SafeBudget: 1:2
+@!@!@ENDMSG 2775 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 24, col 31 to line 24, col 36 of module SafeBudget: 1
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2772:0 @!@!@
+<CheckAndReserve line 26, col 1 to line 26, col 22 of module SafeBudget>: 2:2
+@!@!@ENDMSG 2772 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 26, col 30 to line 26, col 51 of module SafeBudget: 20
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 26, col 30 to line 26, col 41 of module SafeBudget: 18
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 27, col 28 to line 27, col 67 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 27, col 28 to line 27, col 57 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 27, col 28 to line 27, col 43 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 27, col 28 to line 27, col 32 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 27, col 36 to line 27, col 43 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 18, col 13 to line 20, col 45 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 18, col 14 to line 18, col 44 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 18, col 17 to line 18, col 26 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 18, col 33 to line 18, col 37 of module SafeBudget: 1
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 20, col 14 to line 20, col 44 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 20, col 17 to line 20, col 26 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 20, col 33 to line 20, col 37 of module SafeBudget: 1
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 27, col 47 to line 27, col 57 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 14, col 16 to line 14, col 49 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 19 to line 14, col 27 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 34 to line 14, col 38 of module SafeBudget: 3
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 45 to line 14, col 49 of module SafeBudget: 3
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 27, col 52 to line 27, col 56 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 27, col 62 to line 27, col 67 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 28, col 28 to line 28, col 52 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 28, col 36 to line 28, col 52 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 28, col 36 to line 28, col 39 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2775:0 @!@!@
+  ||line 28, col 46 to line 28, col 52 of module SafeBudget: 2:12
+@!@!@ENDMSG 2775 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 28, col 47 to line 28, col 51 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 29, col 28 to line 29, col 68 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 30, col 28 to line 30, col 42 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2772:0 @!@!@
+<Deny line 32, col 1 to line 32, col 11 of module SafeBudget>: 4:4
+@!@!@ENDMSG 2772 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 32, col 19 to line 32, col 40 of module SafeBudget: 22
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 32, col 19 to line 32, col 30 of module SafeBudget: 18
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 33, col 16 to line 33, col 54 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 33, col 16 to line 33, col 45 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 33, col 16 to line 33, col 31 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 33, col 16 to line 33, col 20 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 33, col 24 to line 33, col 31 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 18, col 13 to line 20, col 45 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 18, col 14 to line 18, col 44 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 18, col 17 to line 18, col 26 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 18, col 33 to line 18, col 37 of module SafeBudget: 1
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 20, col 14 to line 20, col 44 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 20, col 17 to line 20, col 26 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||||line 20, col 33 to line 20, col 37 of module SafeBudget: 1
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 33, col 35 to line 33, col 45 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 14, col 16 to line 14, col 49 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 19 to line 14, col 27 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 34 to line 14, col 38 of module SafeBudget: 3
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 45 to line 14, col 49 of module SafeBudget: 3
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 33, col 40 to line 33, col 44 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 33, col 49 to line 33, col 54 of module SafeBudget: 6
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 34, col 16 to line 34, col 58 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 35, col 16 to line 35, col 40 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2772:0 @!@!@
+<Commit line 37, col 1 to line 37, col 13 of module SafeBudget>: 2:4
+@!@!@ENDMSG 2772 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 37, col 21 to line 37, col 41 of module SafeBudget: 22
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 37, col 21 to line 37, col 32 of module SafeBudget: 18
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 38, col 20 to line 38, col 41 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 39, col 20 to line 39, col 47 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 39, col 29 to line 39, col 47 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 39, col 29 to line 39, col 33 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 39, col 37 to line 39, col 47 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 14, col 16 to line 14, col 49 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 19 to line 14, col 27 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 34 to line 14, col 38 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 14, col 45 to line 14, col 49 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 39, col 42 to line 39, col 46 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 40, col 20 to line 40, col 60 of module SafeBudget: 4
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2772:0 @!@!@
+<Done line 43, col 1 to line 43, col 4 of module SafeBudget>: 0:2
+@!@!@ENDMSG 2772 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 42, col 37 to line 42, col 71 of module SafeBudget: 17
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 42, col 37 to line 42, col 48 of module SafeBudget: 13
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 42, col 54 to line 42, col 71 of module SafeBudget: 13
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 42, col 28 to line 42, col 33 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 43, col 23 to line 43, col 36 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2774:0 @!@!@
+<TypeOK line 51, col 1 to line 51, col 6 of module SafeBudget>
+@!@!@ENDMSG 2774 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 51, col 11 to line 54, col 62 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 51, col 14 to line 51, col 26 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 52, col 14 to line 52, col 34 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 53, col 14 to line 53, col 70 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 54, col 14 to line 54, col 62 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 54, col 14 to line 54, col 17 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 54, col 21 to line 54, col 62 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 54, col 41 to line 54, col 61 of module SafeBudget: 18
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 54, col 32 to line 54, col 37 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2774:0 @!@!@
+<BudgetSafety line 55, col 1 to line 55, col 12 of module SafeBudget>
+@!@!@ENDMSG 2774 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  line 55, col 17 to line 55, col 42 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 55, col 17 to line 55, col 32 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 55, col 17 to line 55, col 21 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||line 55, col 25 to line 55, col 32 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||line 18, col 13 to line 20, col 45 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 18, col 14 to line 18, col 44 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 18, col 17 to line 18, col 26 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 18, col 33 to line 18, col 37 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  ||||line 20, col 14 to line 20, col 44 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 20, col 17 to line 20, col 26 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |||||line 20, col 33 to line 20, col 37 of module SafeBudget: 2
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2221:0 @!@!@
+  |line 55, col 37 to line 55, col 42 of module SafeBudget: 9
+@!@!@ENDMSG 2221 @!@!@
+@!@!@STARTMSG 2202:0 @!@!@
+End of statistics.
+@!@!@ENDMSG 2202 @!@!@
+@!@!@STARTMSG 2200:0 @!@!@
+Progress(4) at 2026-11-27 21:29:07: 13 states generated (1 023 s/min), 9 distinct states found (708 ds/min), 0 states left on queue.
+@!@!@ENDMSG 2200 @!@!@
+@!@!@STARTMSG 2199:0 @!@!@
+13 states generated, 9 distinct states found, 0 states left on queue.
+@!@!@ENDMSG 2199 @!@!@
+@!@!@STARTMSG 2194:0 @!@!@
+The depth of the complete state graph search is 4.
+@!@!@ENDMSG 2194 @!@!@
+@!@!@STARTMSG 2268:0 @!@!@
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 2 and the 95th percentile is 2).
+@!@!@ENDMSG 2268 @!@!@
+@!@!@STARTMSG 2186:0 @!@!@
+Finished in 776ms at (2026-11-27 21:29:07)
+@!@!@ENDMSG 2186 @!@!@

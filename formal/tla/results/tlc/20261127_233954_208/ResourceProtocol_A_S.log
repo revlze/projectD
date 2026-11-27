@@ -1,0 +1,34 @@
+TLC2 Version 2026.11.26.020825 (rev: 1138302)
+Warning: Please run the Java VM, which executes TLC with a throughput optimized garbage collector, by passing the "-XX:+UseParallelGC" property.
+(Use the -nowarning option to disable this warning.)
+Running breadth-first search Model-Checking with fp 130 and seed 1235369973267643562 with 1 worker on 12 cores with 4028MB heap and 64MB offheap memory [pid: 23816] (Windows 11 10.0 amd64, Eclipse Adoptium 21.0.13.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file C:\Users\peret\Desktop\Third year\Agents\project\projectD\formal\tla\protocol\ResourceProtocol.tla
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\Integers.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/Integers.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\FiniteSets.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\_TLCTrace.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/_TLCTrace.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\Naturals.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\Sequences.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\TLC.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-17948477700352761225\TLCExt.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/TLCExt.tla)
+Semantic processing of module Naturals
+Semantic processing of module Integers
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module TLCExt
+Semantic processing of module _TLCTrace
+Semantic processing of module ResourceProtocol
+Linting of module TLCExt
+Linting of module _TLCTrace
+Linting of module ResourceProtocol
+Starting... (2026-11-27 23:39:56)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-27 23:39:56.
+Model checking completed. No error has been found.
+  Estimates of the probability that TLC did not check all reachable states
+  because two distinct states had the same fingerprint:
+  calculated (optimistic):  val = 1.4E-12
+10213 states generated, 5370 distinct states found, 0 states left on queue.
+The depth of the complete state graph search is 19.
+The average outdegree of the complete state graph is 1 (minimum is 0, the maximum 12 and the 95th percentile is 2).
+Finished in 00s at (2026-11-27 23:39:56)

@@ -1,0 +1,7 @@
+U/N: 82 states, 126 transitions, violation=True, active_violation=False, release=False
+A/N: 46 states, 72 transitions, violation=False, active_violation=False, release=False
+U immediate: 25 states, 36 transitions, violation=False, active_violation=False, release=False
+A/S: 1150 states, 1800 transitions, violation=False, active_violation=False, release=False
+A/VBC: 460 states, 658 transitions, violation=False, active_violation=False, release=True
+U/VBC: 635 states, 894 transitions, violation=True, active_violation=True, release=True
+A/VBC budget=16: 403 states, 612 transitions, violation=False, active_violation=False, release=False

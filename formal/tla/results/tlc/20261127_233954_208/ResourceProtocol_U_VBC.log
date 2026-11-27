@@ -1,0 +1,270 @@
+TLC2 Version 2026.11.26.020825 (rev: 1138302)
+Warning: Please run the Java VM, which executes TLC with a throughput optimized garbage collector, by passing the "-XX:+UseParallelGC" property.
+(Use the -nowarning option to disable this warning.)
+Running breadth-first search Model-Checking with fp 74 and seed 2536713344627194036 with 1 worker on 12 cores with 4028MB heap and 64MB offheap memory [pid: 17712] (Windows 11 10.0 amd64, Eclipse Adoptium 21.0.13.1 64bit, MSBDiskFPSet, DiskStateQueue).
+Parsing file C:\Users\peret\Desktop\Third year\Agents\project\projectD\formal\tla\protocol\ResourceProtocol.tla
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\Integers.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/Integers.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\FiniteSets.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/FiniteSets.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\_TLCTrace.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/_TLCTrace.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\Naturals.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\Sequences.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\TLC.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/TLC.tla)
+Parsing file C:\Users\peret\AppData\Local\Temp\tlc-18401372648616801743\TLCExt.tla (jar:file:/C:/Users/peret/.vscode/extensions/tlaplus.vscode-ide-2026.11.260224/out/tools/tla2tools.jar!/tla2sany/StandardModules/TLCExt.tla)
+Semantic processing of module Naturals
+Semantic processing of module Integers
+Semantic processing of module Sequences
+Semantic processing of module FiniteSets
+Semantic processing of module TLC
+Semantic processing of module TLCExt
+Semantic processing of module _TLCTrace
+Semantic processing of module ResourceProtocol
+Linting of module TLCExt
+Linting of module _TLCTrace
+Linting of module ResourceProtocol
+Starting... (2026-11-27 23:40:05)
+Computing initial states...
+Finished computing initial states: 1 distinct state generated at 2026-11-27 23:40:06.
+Error: Invariant BudgetSafety is violated.
+Error: The behavior up to this point is:
+State 1: <Initial predicate>
+/\ phase = "proposal1"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 0
+/\ proposals = [ A |-> [present |-> FALSE, items |-> {}],
+  B |-> [present |-> FALSE, items |-> {}] ]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 2: <Propose("A",{}) line 80, col 25 to line 85, col 95 of module ResourceProtocol>
+/\ phase = "proposal1"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 0
+/\ proposals = [ A |-> [present |-> TRUE, items |-> {}],
+  B |-> [present |-> FALSE, items |-> {}] ]
+/\ agreedVersion = 0
+/\ decided = {"A"}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 3: <Propose("B",{}) line 80, col 25 to line 85, col 95 of module ResourceProtocol>
+/\ phase = "proposal1"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 0
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {"A", "B"}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 4: <Publish line 92, col 12 to line 97, col 77 of module ResourceProtocol>
+/\ phase = "proposal2"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 1
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 5: <Propose("A",{}) line 80, col 25 to line 85, col 95 of module ResourceProtocol>
+/\ phase = "proposal2"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 1
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {"A"}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 6: <Propose("B",{}) line 80, col 25 to line 85, col 95 of module ResourceProtocol>
+/\ phase = "proposal2"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 1
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {"A", "B"}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 7: <Publish line 92, col 12 to line 97, col 77 of module ResourceProtocol>
+/\ phase = "confirm"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 0, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 8: <Confirm("A",2) line 99, col 22 to line 105, col 88 of module ResourceProtocol>
+/\ phase = "confirm"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {"A"}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 9: <SkipConfirm("B") line 107, col 23 to line 110, col 104 of module ResourceProtocol>
+/\ phase = "confirm"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {"A", "B"}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 10: <ResolveAgreement line 112, col 21 to line 118, col 80 of module ResourceProtocol>
+/\ phase = "execute"
+/\ selected = [qa |-> "none", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [qa |-> "idle", report |-> "idle", regression |-> "idle", ablation |-> "idle"]
+/\ held = 0
+
+State 11: <Accept("A",<<"qa", "full">>) line 126, col 24 to line 133, col 60 of module ResourceProtocol>
+/\ phase = "execute"
+/\ selected = [qa |-> "full", report |-> "none", regression |-> "none", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [ qa |-> "pending",
+  report |-> "idle",
+  regression |-> "idle",
+  ablation |-> "idle" ]
+/\ held = 0
+
+State 12: <Accept("B",<<"regression", "full">>) line 126, col 24 to line 133, col 60 of module ResourceProtocol>
+/\ phase = "execute"
+/\ selected = [qa |-> "full", report |-> "none", regression |-> "full", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 0
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [ qa |-> "pending",
+  report |-> "idle",
+  regression |-> "pending",
+  ablation |-> "idle" ]
+/\ held = 0
+
+State 13: <Commit(<<"qa", "full">>) line 135, col 17 to line 139, col 80 of module ResourceProtocol>
+/\ phase = "execute"
+/\ selected = [qa |-> "full", report |-> "none", regression |-> "full", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 7
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [ qa |-> "running",
+  report |-> "idle",
+  regression |-> "pending",
+  ablation |-> "idle" ]
+/\ held = 0
+
+State 14: <Commit(<<"regression", "full">>) line 135, col 17 to line 139, col 80 of module ResourceProtocol>
+/\ phase = "execute"
+/\ selected = [qa |-> "full", report |-> "none", regression |-> "full", ablation |-> "none"]
+/\ releaseAvailable = 0
+/\ releasePair = <<"none", "none">>
+/\ released = FALSE
+/\ version = 2
+/\ proposals = [A |-> [present |-> TRUE, items |-> {}], B |-> [present |-> TRUE, items |-> {}]]
+/\ agreedVersion = 0
+/\ decided = {}
+/\ spent = 13
+/\ guardedAccepted = {}
+/\ confirmations = [A |-> 2, B |-> 0]
+/\ status = [ qa |-> "running",
+  report |-> "idle",
+  regression |-> "running",
+  ablation |-> "idle" ]
+/\ held = 0
+
+3425 states generated, 1918 distinct states found, 633 states left on queue.
+The depth of the complete state graph search is 14.
+Finished in 00s at (2026-11-27 23:40:06)
+Trace exploration spec path: .\ResourceProtocol_TTrace_1795812005.tla

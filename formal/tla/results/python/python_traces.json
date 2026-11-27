@@ -1,0 +1,1282 @@
+[
+  {
+    "case": "unsafe_overlap",
+    "spent": 13,
+    "released": 0,
+    "violated": true,
+    "events": [
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "atomic_overlap",
+    "spent": 7,
+    "released": 0,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "insufficient_budget",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "unsafe_immediate",
+    "spent": 7,
+    "released": 0,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "insufficient_budget",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "atomic_release_and_fallback",
+    "spent": 9,
+    "released": 1,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "plan_mismatch",
+        "agent": "A",
+        "job": "qa",
+        "option": "short",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 41,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 41,
+        "event": "submit",
+        "result": "insufficient_budget",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 41,
+        "event": "plan_released",
+        "result": "ok",
+        "agent": "B",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 43,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 45,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 45,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 7,
+        "held": 2
+      },
+      {
+        "time": 47,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 9,
+        "held": 0
+      },
+      {
+        "time": 49,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 9,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "feasible_revised_plan",
+    "spent": 12,
+    "released": 0,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "prerequisite_not_completed",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 6
+      },
+      {
+        "time": 41,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "short",
+        "spent": 0,
+        "held": 10
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 6,
+        "held": 4
+      },
+      {
+        "time": 43,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "short",
+        "spent": 10,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 10,
+        "held": 0
+      },
+      {
+        "time": 45,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "short",
+        "spent": 10,
+        "held": 0
+      },
+      {
+        "time": 45,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 10,
+        "held": 2
+      },
+      {
+        "time": 47,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 12,
+        "held": 0
+      },
+      {
+        "time": 49,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 12,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "dependency_blocks_guarded_plan",
+    "spent": 0,
+    "released": 0,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "prerequisite_not_completed",
+        "agent": "A",
+        "job": "report",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 41,
+        "event": "submit",
+        "result": "plan_mismatch",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "agreement_without_guard",
+    "spent": 7,
+    "released": 0,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "insufficient_budget",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "unsafe_agreement_over_budget",
+    "spent": 13,
+    "released": 0,
+    "violated": true,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "missing_plan_U",
+    "spent": 13,
+    "released": 0,
+    "violated": true,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreement_failed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "missing_plan_A",
+    "spent": 7,
+    "released": 0,
+    "violated": false,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreement_failed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "insufficient_budget",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 7
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      }
+    ]
+  },
+  {
+    "case": "tlc_u_vbc_fallback",
+    "spent": 13,
+    "released": 0,
+    "violated": true,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreement_failed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      }
+    ],
+    "counterexample_projection": [
+      {
+        "time": 6,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "A",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 6,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "B",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 7,
+        "event": "plan_version",
+        "result": "ok",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 1,
+          "proposals": {
+            "A": {
+              "items": [],
+              "disclosed_alternatives": [],
+              "note": ""
+            },
+            "B": {
+              "items": [],
+              "disclosed_alternatives": [],
+              "note": ""
+            }
+          }
+        }
+      },
+      {
+        "time": 33,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "A",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 33,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "B",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 35,
+        "event": "plan_version",
+        "result": "ok",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 2,
+          "proposals": {
+            "A": {
+              "items": [],
+              "disclosed_alternatives": [],
+              "note": ""
+            },
+            "B": {
+              "items": [],
+              "disclosed_alternatives": [],
+              "note": ""
+            }
+          }
+        }
+      },
+      {
+        "time": 37,
+        "event": "confirm_plan",
+        "result": "ok",
+        "agent": "A",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 2
+        }
+      },
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreement_failed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": null,
+          "confirmations": {
+            "A": 2
+          },
+          "enforced": false,
+          "fallback": true
+        }
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "commit_at": 42
+        }
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "commit_at": 42
+        }
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0,
+        "detail": {}
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0,
+        "detail": {}
+      }
+    ]
+  },
+  {
+    "case": "tlc_u_vbc_agreed",
+    "spent": 13,
+    "released": 0,
+    "violated": true,
+    "events": [
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      },
+      {
+        "time": 44,
+        "event": "complete",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0
+      }
+    ],
+    "counterexample_projection": [
+      {
+        "time": 6,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "A",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 6,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "B",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 7,
+        "event": "plan_version",
+        "result": "ok",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 1,
+          "proposals": {
+            "A": {
+              "items": [],
+              "disclosed_alternatives": [],
+              "note": ""
+            },
+            "B": {
+              "items": [],
+              "disclosed_alternatives": [],
+              "note": ""
+            }
+          }
+        }
+      },
+      {
+        "time": 33,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "A",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [
+            {
+              "job_id": "qa",
+              "option_id": "full",
+              "cost": 7
+            }
+          ],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 33,
+        "event": "propose_plan",
+        "result": "ok",
+        "agent": "B",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "items": [
+            {
+              "job_id": "regression",
+              "option_id": "full",
+              "cost": 6
+            }
+          ],
+          "disclosed_alternatives": [],
+          "note": ""
+        }
+      },
+      {
+        "time": 35,
+        "event": "plan_version",
+        "result": "ok",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 2,
+          "proposals": {
+            "A": {
+              "items": [
+                {
+                  "job_id": "qa",
+                  "option_id": "full",
+                  "cost": 7
+                }
+              ],
+              "disclosed_alternatives": [],
+              "note": ""
+            },
+            "B": {
+              "items": [
+                {
+                  "job_id": "regression",
+                  "option_id": "full",
+                  "cost": 6
+                }
+              ],
+              "disclosed_alternatives": [],
+              "note": ""
+            }
+          }
+        }
+      },
+      {
+        "time": 37,
+        "event": "confirm_plan",
+        "result": "ok",
+        "agent": "A",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 2
+        }
+      },
+      {
+        "time": 37,
+        "event": "confirm_plan",
+        "result": "ok",
+        "agent": "B",
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 2
+        }
+      },
+      {
+        "time": 40,
+        "event": "agreement",
+        "result": "agreed",
+        "agent": null,
+        "job": null,
+        "option": null,
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "plan_version": 2,
+          "confirmations": {
+            "A": 2,
+            "B": 2
+          },
+          "enforced": true,
+          "fallback": false
+        }
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "commit_at": 42,
+          "plan_version": 2,
+          "off_plan": false
+        }
+      },
+      {
+        "time": 40,
+        "event": "submit",
+        "result": "accepted",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 0,
+        "held": 0,
+        "detail": {
+          "commit_at": 42,
+          "plan_version": 2,
+          "off_plan": false
+        }
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "A",
+        "job": "qa",
+        "option": "full",
+        "spent": 7,
+        "held": 0,
+        "detail": {}
+      },
+      {
+        "time": 42,
+        "event": "commit",
+        "result": "ok",
+        "agent": "B",
+        "job": "regression",
+        "option": "full",
+        "spent": 13,
+        "held": 0,
+        "detail": {}
+      }
+    ]
+  }
+]
