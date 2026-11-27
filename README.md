@@ -51,3 +51,43 @@ uv run python -m project_d.experiments.matrix E1 --baseline-only --dry-run
 ```
 
 The research entrypoint is `project_d.experiments.matrix`. Test series require `--allow-test` and the full selection. Each output directory has an immutable configuration manifest. Resume verifies SHA-256 receipts, audits complete episodes, and recomputes their summaries. Failed attempts are retained under `attempts/`. Scenario JSON uses LF on every platform. Generate data only into a scratch directory with `generator --out PATH`; the tracked sample remains fixed.
+
+## Results of record
+
+| Directory | Content |
+| --- | --- |
+| `results/e0-08b2675` | E0, 108 scripted runs without an LLM |
+| `results/e1-7a475c0`, `results/e1s-9ad7d2e` | E1 on `dev`: 400 baseline and 280 structured episodes |
+| `results/test-32abf0e` | E2, E3, E4-H1 and E4-delay on `test`, 1824 episodes, one frozen configuration |
+| `results/test-32abf0e/analysis` | Paired bootstrap, family and profile tables, E3/E4 joins, plan metrics, root conflict, usage, figures |
+| `results/test-32abf0e/annotation` | Fixed 108-episode sample for manual annotation, with rules and empty sheets |
+
+Every series directory has a README with the exact run command, configuration and outcome.
+
+## Reproducing the test analysis
+
+These steps make no model calls; they recompute everything from the committed journals and summaries:
+
+```bash
+# statistics and tables (E2 bootstrap, E3 and E4-delay joined with E2 keys, E4-H1 journals)
+uv run python -m project_d.evaluation.test_analysis results/test-32abf0e --out results/test-32abf0e/analysis
+# main-job conflict outcomes, audited per journal
+uv run python -m project_d.evaluation.root_report results/test-32abf0e/e2 results/test-32abf0e/e3 \
+  results/test-32abf0e/e4-h1 results/test-32abf0e/e4-delay > results/test-32abf0e/analysis/root_conflict.csv
+# SVG figures from the tables above
+uv run python -m project_d.evaluation.plots results/test-32abf0e/analysis
+# one contrast, as in docs/experiments.md
+uv run python -m project_d.evaluation.bootstrap results/test-32abf0e/e2/deepseek-v4-1-flash-1017/summary.csv A/VBC A/R3P
+# transcripts for manual annotation (existing sheets are never overwritten)
+uv run python -m project_d.evaluation.annotation_sample results/test-32abf0e --out results/test-32abf0e/annotation
+```
+
+The bootstrap uses 10 000 draws with seed 20261124, so the numbers reproduce exactly. To rerun a series itself (API key required), use the command in that series' README; for example, E2:
+
+```bash
+uv run python -m project_d.experiments.matrix E2 --allow-test --provider mistral \
+  --model deepseek-v4-1-flash-1017 --reasoning-effort none --workers 30 \
+  --output-dir outputs/e2-32abf0e/deepseek-v4-1-flash-1017
+```
+
+Hosted weights cannot be pinned, so a rerun reproduces the procedure, not the exact model outputs. The saved journals are the record.

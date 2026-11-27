@@ -6,7 +6,10 @@ All tables here are recomputed from the saved summaries and journals in this dir
 uv run python -m project_d.evaluation.test_analysis results/test-32abf0e --out results/test-32abf0e/analysis
 uv run python -m project_d.evaluation.root_report results/test-32abf0e/e2 results/test-32abf0e/e3 \
   results/test-32abf0e/e4-h1 results/test-32abf0e/e4-delay > results/test-32abf0e/analysis/root_conflict.csv
+uv run python -m project_d.evaluation.plots results/test-32abf0e/analysis
 ```
+
+Figures (`figures/`, SVG): `e2_safe_fraction.svg`, `e2_violations.svg`, `e2_prompt_tokens.svg`, `e2_bootstrap.svg` (forest plot of all E2 contrasts) and `e4_h1_violations.svg`.
 
 Method (`docs/experiments.md`, section 4): the four repeats are averaged within each profile, and differences are paired per profile. Only E2 (28 profiles) gets the stratified profile bootstrap, with 10 000 draws, seed 20261124, and resampling within S0-S4. The interval is the 2.5-97.5 percentile range of the mean paired difference. It describes how robust the result is to the choice of profiles; it is not a significance test. E3 (12 profiles) and E4-delay (6 profiles, all S4) are descriptive only. `violation` is the episode share with `spent > budget`, and `utility_fraction` is U/U* without the safety cut. In A, `safe_fraction = utility_fraction` because no A episode overran.
 

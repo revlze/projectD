@@ -1,0 +1,49 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='640' height='340' viewBox='0 0 640 340' role='img'>
+<title>E2: prompt tokens per episode</title>
+<rect width='640' height='340' fill='#ffffff'/>
+<text x='16.0' y='24.0' font-size='15' text-anchor='start' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>E2: prompt tokens per episode</text>
+<text x='16.0' y='42.0' font-size='11' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>Mean provider-reported prompt tokens (thousands); cost of each protocol</text>
+<rect x='56.0' y='53.0' width='10.0' height='10.0' fill='#257de0' stroke='none' stroke-width='2'/>
+<text x='71.0' y='62.0' font-size='11' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>U (no reservation)</text>
+<rect x='197.0' y='53.0' width='10.0' height='10.0' fill='#f47230' stroke='none' stroke-width='2'/>
+<text x='212.0' y='62.0' font-size='11' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>A (atomic reservation)</text>
+<line x1='56.0' y1='296.0' x2='620.0' y2='296.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='48.0' y='300.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0k</text>
+<line x1='56.0' y1='222.0' x2='620.0' y2='222.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='48.0' y='226.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>50k</text>
+<line x1='56.0' y1='148.0' x2='620.0' y2='148.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='48.0' y='152.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>100k</text>
+<line x1='56.0' y1='74.0' x2='620.0' y2='74.0' stroke='#e3e3e3' stroke-width='1'/>
+<text x='48.0' y='78.0' font-size='10' text-anchor='end' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>150k</text>
+<path d='M74.0,296.0 V244.8 Q74.0,240.8 78.0,240.8 H98.0 Q102.0,240.8 102.0,244.8 V296.0 Z' fill='#257de0'/>
+<text x='88.0' y='235.8' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>37k</text>
+<path d='M104.0,296.0 V235.8 Q104.0,231.8 108.0,231.8 H128.0 Q132.0,231.8 132.0,235.8 V296.0 Z' fill='#f47230'/>
+<text x='118.0' y='226.8' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>43k</text>
+<text x='103.0' y='314.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>N</text>
+<path d='M168.0,296.0 V113.3 Q168.0,109.3 172.0,109.3 H192.0 Q196.0,109.3 196.0,113.3 V296.0 Z' fill='#257de0'/>
+<text x='182.0' y='104.3' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>126k</text>
+<path d='M198.0,296.0 V109.2 Q198.0,105.2 202.0,105.2 H222.0 Q226.0,105.2 226.0,109.2 V296.0 Z' fill='#f47230'/>
+<text x='212.0' y='100.2' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>129k</text>
+<text x='197.0' y='314.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>F</text>
+<path d='M262.0,296.0 V210.7 Q262.0,206.7 266.0,206.7 H286.0 Q290.0,206.7 290.0,210.7 V296.0 Z' fill='#257de0'/>
+<text x='276.0' y='201.7' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>60k</text>
+<path d='M292.0,296.0 V206.3 Q292.0,202.3 296.0,202.3 H316.0 Q320.0,202.3 320.0,206.3 V296.0 Z' fill='#f47230'/>
+<text x='306.0' y='197.3' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>63k</text>
+<text x='291.0' y='314.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>R1</text>
+<path d='M356.0,296.0 V179.9 Q356.0,175.9 360.0,175.9 H380.0 Q384.0,175.9 384.0,179.9 V296.0 Z' fill='#257de0'/>
+<text x='370.0' y='170.9' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>81k</text>
+<path d='M386.0,296.0 V174.2 Q386.0,170.2 390.0,170.2 H410.0 Q414.0,170.2 414.0,174.2 V296.0 Z' fill='#f47230'/>
+<text x='400.0' y='165.2' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>85k</text>
+<text x='385.0' y='314.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>R3</text>
+<path d='M450.0,296.0 V179.3 Q450.0,175.3 454.0,175.3 H474.0 Q478.0,175.3 478.0,179.3 V296.0 Z' fill='#257de0'/>
+<text x='464.0' y='170.3' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>82k</text>
+<path d='M480.0,296.0 V171.5 Q480.0,167.5 484.0,167.5 H504.0 Q508.0,167.5 508.0,171.5 V296.0 Z' fill='#f47230'/>
+<text x='494.0' y='162.5' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>87k</text>
+<text x='479.0' y='314.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>R3P</text>
+<path d='M544.0,296.0 V160.2 Q544.0,156.2 548.0,156.2 H568.0 Q572.0,156.2 572.0,160.2 V296.0 Z' fill='#257de0'/>
+<text x='558.0' y='151.2' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>94k</text>
+<path d='M574.0,296.0 V139.8 Q574.0,135.8 578.0,135.8 H598.0 Q602.0,135.8 602.0,139.8 V296.0 Z' fill='#f47230'/>
+<text x='588.0' y='130.8' font-size='10' text-anchor='middle' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>108k</text>
+<text x='573.0' y='314.0' font-size='12' text-anchor='middle' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>VBC</text>
+<line x1='56.0' y1='296.0' x2='620.0' y2='296.0' stroke='#6b6b6b' stroke-width='1'/>
+</svg>
