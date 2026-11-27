@@ -69,7 +69,9 @@ The research entrypoint is `project_d.experiments.matrix`. Test series require `
 
 Every series directory has a README with the exact run command, configuration and outcome.
 
-The basic U/A TLA+ models were checked with TLC. The extended G model, comparison with Python traces and manual annotation are pending.
+[Formal validation](formal/tla/validation.md) is complete. TLC checked two pilot models and nine configurations of the extended U/A/G model, including `U/VBC`. The checks produced four expected counterexamples and seven successful exhaustive searches. Twelve Python control traces include replays of the key transitions of all three extended counterexamples. The verification covers enforcement while G is active, the conditions for releasing G, the fact that it stays released, and budget safety during fallback under A. These results apply to the checked finite abstraction and selected Python traces.
+
+The remaining stages are negotiation annotation, AgentBeats, the research report and the defense.
 
 ## Reproducing the test analysis
 
