@@ -42,9 +42,9 @@ Method (`docs/experiments.md`, section 4): the four repeats are averaged within 
 
 Reading:
 
-- **H3.** Every U/A pair favours A, and every interval excludes 0. A never improves a profile's raw utility, though: U/U* is lower in A in every pair, for example A/N − U/N = −0.260. Reservation buys safety by refusing work, not by finding a better plan.
-- **H2.** Without reservation, communication changes outcomes much more than any other factor: F, R3 and R3P are far above N and R1. With reservation the spread is under 0.09. A/F is the best variant overall. A single assigned round (R1) is worse than free messaging in both modes. The extra budget instruction in R3P helps under U (+0.096) but has no effect under A (interval spans 0).
-- **H4.** A/VBC beats only the two weakest atomic baselines, A/N and A/R1. It is below A/F with the interval excluding 0, and below A/R3P with the interval just excluding 0 (upper bound −0.001), so "worse than R3P" holds only marginally. It ties A/R3 within the interval. Without reservation, U/VBC raises raw utility over U/R3P (+0.022) but overruns more often (+0.214 of episodes), which is the over-budget-agreement mechanism below.
+- **H3.** Every U/A pair favours A, and every interval excludes 0. Mean raw utility U/U* is lower in A in each of the six pairs, for example A/N − U/N = −0.260, although some profiles improve. Reservation protects the budget by refusing work when funds are unavailable.
+- **H2.** Without reservation, communication changes outcomes much more than any other factor: F, R3 and R3P are far above N and R1. With reservation the spread is under 0.09. A/F is the best variant overall. A single assigned round (R1) is worse than free messaging in both modes. The extra budget instruction in R3P helps under U (+0.096). Under A the paired interval spans zero.
+- **H4.** A/VBC beats only the two weakest atomic baselines, A/N and A/R1. It is below A/F with the interval excluding 0, and below A/R3P with the interval just excluding 0 (upper bound −0.001), so "worse than R3P" holds only marginally. The paired interval versus A/R3 includes zero, leaving the direction of the difference uncertain. Without reservation, U/VBC raises raw utility over U/R3P (+0.022) but overruns more often (+0.214 of episodes), which is the over-budget-agreement mechanism below.
 
 ### By family (U_safe/U*, profile means; `e2_families_safe_fraction.csv`)
 
@@ -63,7 +63,7 @@ Reading:
 | U/VBC | 0.997 | 0.375 | 0.788 | 0.167 | 0.450 | 0.524 |
 | A/VBC | 1.000 | 0.917 | 0.963 | 0.756 | 0.974 | 0.916 |
 
-S0 (everything fits) is solved by every variant. The A variants differ mostly on S3, where A/F reaches 0.918 and A/VBC 0.756, and on S2. S1 caps every U variant near 0.5, because in S1 the two main jobs cannot both fit and U agents rarely yield. Families have 4-6 profiles, so these numbers are descriptive.
+S0 (everything fits) is solved by every variant. The A variants differ mostly on S3, where A/F reaches 0.918 and A/VBC 0.756, and on S2. The mean for every U variant in S1 is near 0.5. In some S1 profiles the two main jobs cannot both fit. Other profiles have contention over additional work. Families have 4-6 profiles, so these numbers are descriptive.
 
 ### Structured plans in E2 (`e2_structured.csv`)
 
@@ -98,7 +98,7 @@ These are the 36 E2 episodes per variant where the cheapest variants of both mai
 | A/R3P | 36 | 0 | 8 | 22 / 36 |
 | A/VBC | 36 | 0 | 5 | 21 / 36 |
 
-Under A/N and A/R1 the queue decides which main job wins: the higher-value job wins 18 of 36, exactly chance level. Free communication makes one agent step aside in 12 of 36 episodes, and the higher-value job then wins 26 of 36. VBC makes an agent yield least often among the communicating variants (5 of 36).
+Under A/N and A/R1 the higher-value job wins 18 of 36 episodes (50%) with balanced processing order. Under A/F one main job was not submitted in 12 of 36 episodes, and the higher-value job wins 26 of 36 overall. A/VBC has 5 episodes with a main job not submitted, and A/R1 has none. Voluntary concessions require transcript annotation. In the E2/E5 root-conflict episodes with both main jobs submitted, the first submissions occur at different ticks in 7 of 24 for A/F, 0 of 24 for A/VBC-F, and 0 of 31 for A/VBC. The per-agent ticks are in `root_submission_times_e2_e5.csv`. A time gap alone gives no evidence of an agreed execution order.
 
 ## E3 - V x G and rounds (12 profiles of `e3_subset`, descriptive; `e3_contrasts.csv`)
 
@@ -114,11 +114,11 @@ A/VBC, A/R3P and A/N are taken from E2 on the same `(profile, repeat)` keys. The
 | 2 rounds vs 1 (VBC-r2 − VBC) | +0.017 | +4/-2/=6 |
 | A/S − A/R3P (whole protocol) | −0.033 | +1/-8/=3 |
 
-Each component alone is slightly positive, but the effects do not add up: with the other component on, each one's effect is about zero. All effects are under 0.03 on 12 profiles. Plan statistics show what V does (`e3_structured.csv`): it cuts over-budget agreements from 26 of 38 (A/S) to 5 of 20 (A/S+V), but also halves the number of agreements. G without V raises agreements to 47 of 48, of which 33 are over budget. Two revision rounds give the most within-budget agreements (26 of 48).
+Each component alone is slightly positive, but the effects do not add up: with the other component on, each one's effect is about zero. All effects are under 0.03 on 12 profiles. Plan statistics show what V does (`e3_structured.csv`): it cuts over-budget agreements from 26 of 38 (A/S) to 5 of 20 (A/S+V), but also halves the number of agreements. G without V raises agreements to 47 of 48, of which 33 are over budget. Two message rounds followed by one plan revision give the most within-budget agreements (26 of 48).
 
 ## E4-H1 - overlap (`e4_h1_cells.csv`, `e4_h1_episodes.csv`)
 
-In all 144 episodes both agents submitted their main job; no agent held back, in U/N or in U/R3P. A budget violation occurred exactly when the actual offset between the two first submissions was smaller than `commit_delay`. Every one of those 46 episodes had an admission while another accepted request was still uncommitted. None of the other 98 episodes had a violation or such an overlap. Negotiation (R3P) did not change submission timing: actual offsets follow `start_gap` (the mean offset is within 0.25 of the gap in every cell). The two U/R3P cells with 7 of 8 violations each contain one episode where an agent submitted one or two steps later than allowed, which removed the overlap.
+In all 144 episodes both agents submitted their main job, in U/N and U/R3P. A budget violation occurred exactly when the actual offset between the two first submissions was smaller than `commit_delay`. Every one of those 46 episodes had an admission while another accepted request was still uncommitted. None of the other 98 episodes had a violation or such an overlap. In both variants the mean offset is within 0.25 of `start_gap` in every cell. The two U/R3P cells with 7 of 8 violations each contain one episode where an agent submitted one or two steps after submission opened, which removed the overlap.
 
 ## E4-delay (six S4 profiles, delay 1 from E2; descriptive)
 
@@ -128,7 +128,7 @@ In all 144 episodes both agents submitted their main job; no agent held back, in
 | A/VBC U_safe/U* | 0.974 | 0.966 | 0.963 |
 | A/VBC agreed / over budget (of 24) | 14 / 7 | 11 / 0 | 15 / 5 |
 
-All differences from delay 1 are within ±0.011. In A/R3P at delay 8, messages per episode drop from 6 to 4, because the environment skips one round per agent (`rounds_skipped = 2` in all 24 episodes). Every sent message was read. Mean send-to-read time is 11.3 steps at delays 1 and 4 and 17.0 at delay 8 (`e4_delay_messages.csv`). At delay 4 the time does not change, because messages are read at fixed round times anyway. In A/VBC the send-to-read time is 20 at every delay, so delay does not change what VBC agents see before revision. As planned, this is a robustness check.
+All differences from delay 1 are within ±0.011. In A/R3P at delay 8, messages per episode drop from 6 to 4, because each agent chooses `skip_round` when the peer's message is still in flight (`rounds_skipped = 2` in all 24 episodes). Every sent message was read. Mean send-to-read time is 11.3 steps at delays 1 and 4 and 17.0 at delay 8 (`e4_delay_messages.csv`). At delay 4 the time does not change, because messages are read at fixed round times anyway. In A/VBC the send-to-read time is 20 at every delay, so delay does not change what VBC agents see before revision. As planned, this is a robustness check.
 
 ## Usage (`usage.csv`)
 
