@@ -16,6 +16,8 @@ import csv
 import json
 from pathlib import Path
 
+from project_d.environment.model import load_scenario
+
 DATA = Path(__file__).resolve().parents[3] / "data" / "scenarios"
 VARIANTS = ("U/F", "A/F", "U/R1", "A/R1", "U/R3", "A/R3", "U/R3P", "A/R3P", "A/VBC")
 ANNOTATORS = ("platon", "seva")
@@ -49,15 +51,21 @@ def sample(results: Path) -> list[Path]:
 def transcript(path: Path) -> str:
     raw = [json.loads(line) for line in path.read_bytes().splitlines()]
     metadata, events = raw[0]["metadata"], raw[1:]
+    scenario = load_scenario(DATA / "test" / f"{metadata['scenario_id']}.json")
+    if metadata["role_swap"]:
+        scenario = scenario.with_role_swap()
     lines = [
         f"# {path.name.removesuffix('.log.jsonl')}",
         "",
         f"Budget {metadata['budget']}, horizon {metadata['horizon']}, "
         f"first_agent {metadata['first_agent']}, role_swap {metadata['role_swap']}.",
         "",
-        "## Catalog (visible to the owner only)",
+        "## Original user requests",
         "",
     ]
+    for agent in scenario.agents:
+        lines += [f"### Agent {agent.agent_id}", "", agent.user_request, ""]
+    lines += ["## Catalog (visible to the owner only)", ""]
     for job_id, job in metadata["catalog"].items():
         options = ", ".join(f"{o} cost {v['cost']}" for o, v in job["options"].items())
         requires = metadata.get("requires", {}).get(job_id)
@@ -66,7 +74,8 @@ def transcript(path: Path) -> str:
     lines += ["", "## Messages and plans", ""]
     for event in events:
         kind, detail = event["event_type"], event["detail"]
-        if kind not in SHOWN or event["result"] != "ok":
+        expected = ("agreed", "agreement_failed") if kind == "agreement" else ("ok",)
+        if kind not in SHOWN or event["result"] not in expected:
             continue
         head = f"**t={event['time']} {event['agent_id'] or 'env'} {kind}**"
         if kind == "send_message":
@@ -88,6 +97,8 @@ def transcript(path: Path) -> str:
                 f"{head}: v{detail['plan_version']} {detail['status']}, "
                 f"total {detail['requested_total']} of {detail['budget']}"
             )
+        elif kind == "agreement":
+            lines.append(f"{head}: {event['result']} {json.dumps(detail, ensure_ascii=False)}")
         else:
             lines.append(f"{head}: {json.dumps(detail, ensure_ascii=False)}")
         lines.append("")
