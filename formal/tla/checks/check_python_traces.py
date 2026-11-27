@@ -138,6 +138,45 @@ def run() -> list[dict]:
         submit(env, "B", REG, "accepted" if variant.startswith("U") else "insufficient_budget")
         out.append(finish("missing_plan_" + variant[0], env, spent=13 if variant.startswith("U") else 7,
                           releases=0, violated=variant.startswith("U")))
+    # Replay the two structured TLC counterexamples, including the initial
+    # empty plans, the second version and the actual confirmation decisions.
+    for agreed in (False, True):
+        env = env_for("U/VBC")
+        env.advance_to(6)
+        for agent in ("A", "B"):
+            expect(env, agent, ProposePlan(()), "ok")
+        env.advance_to(13)
+        for agent in ("A", "B"):
+            expect(env, agent, SkipRound(), "ok")
+        env.advance_to(33)
+        expect(env, "A", ProposePlan((QA,) if agreed else ()), "ok")
+        expect(env, "B", ProposePlan((REG,) if agreed else ()), "ok")
+        env.advance_to(37)
+        expect(env, "A", ConfirmPlan(2), "ok")
+        if agreed:
+            expect(env, "B", ConfirmPlan(2), "ok")
+        env.advance_to(40)
+        agreement = [e for e in env.log if e.event_type == "agreement"][-1]
+        assert agreement.result == ("agreed" if agreed else "agreement_failed")
+        assert agreement.detail["enforced"] == agreed
+        submit(env, "A", QA, "accepted")
+        submit(env, "B", REG, "accepted")
+        trace = finish("tlc_u_vbc_agreed" if agreed else "tlc_u_vbc_fallback", env,
+                       spent=13, releases=0, violated=True)
+        events = [e for e in env.log if e.event_type in {
+            "propose_plan", "plan_version", "confirm_plan", "agreement", "submit", "commit"
+        }]
+        trace["counterexample_projection"] = [
+            dict(time=e.time, event=e.event_type, result=e.result, agent=e.agent_id,
+                 job=e.job_id, option=e.option_id, spent=e.spent_after, held=e.held_after,
+                 detail=e.detail) for e in events
+        ]
+        assert [(e.event_type, e.job_id, e.spent_after, e.held_after)
+                for e in events if e.event_type in {"submit", "commit"}] == [
+                    ("submit", "qa", 0, 0), ("submit", "regression", 0, 0),
+                    ("commit", "qa", 7, 0), ("commit", "regression", 13, 0)
+                ]
+        out.append(trace)
     return out
 
 
