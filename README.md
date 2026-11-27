@@ -61,6 +61,7 @@ The research entrypoint is `project_d.experiments.matrix`. Test series require `
 | `results/test-32abf0e` | E2, E3, E4-H1 and E4-delay on `test`, 1824 episodes, one frozen configuration |
 | `results/test-32abf0e/analysis` | Paired bootstrap, family and profile tables, E3/E4 joins, plan metrics, root conflict, usage, figures |
 | `results/test-32abf0e/annotation` | Fixed 108-episode sample for manual annotation, with rules and empty sheets |
+| `results/e5-6a5b6f70` | E5, post-hoc exploratory: A/VBC-F on `test`, 112 episodes, compared with E2 on the same keys |
 
 Every series directory has a README with the exact run command, configuration and outcome.
 
@@ -78,6 +79,11 @@ uv run python -m project_d.evaluation.root_report results/test-32abf0e/e2 result
 uv run python -m project_d.evaluation.plots results/test-32abf0e/analysis
 # one contrast, as in docs/experiments.md
 uv run python -m project_d.evaluation.bootstrap results/test-32abf0e/e2/deepseek-v4-1-flash-1017/summary.csv A/VBC A/R3P
+# E5 (A/VBC-F) against E2 on the same keys
+uv run python -m project_d.evaluation.e5_analysis results/e5-6a5b6f70/deepseek-v4-1-flash-1017/summary.csv \
+  results/test-32abf0e/e2/deepseek-v4-1-flash-1017/summary.csv --out results/e5-6a5b6f70/analysis
+# requests and journals of recorded episodes rebuilt through the current code
+uv run python -m project_d.experiments.replay_check results/test-32abf0e/e2/deepseek-v4-1-flash-1017
 # transcripts for manual annotation (existing sheets are never overwritten)
 uv run python -m project_d.evaluation.annotation_sample results/test-32abf0e --out results/test-32abf0e/annotation
 ```
