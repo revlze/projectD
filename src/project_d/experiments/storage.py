@@ -245,6 +245,8 @@ class RunStore:
                 phase = "propose"
             elif variant.structured and time == CONFIRM_TIME:
                 phase = "confirm"
+            elif variant.in_free_negotiation(time):
+                phase = "free_negotiation"
             elif time < opens_at:
                 phase = "preparation"
             elif time < metadata.submission_open_at[turn.agent_id]:

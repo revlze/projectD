@@ -219,6 +219,9 @@ class Environment:
     @property
     def metadata(self) -> EpisodeMetadata:
         seed = self.config.environment_seed
+        protocol_version = "vbc-5" if self.variant.structured else "baseline-phases-1"
+        if self.variant.free_negotiation:
+            protocol_version = "vbc-5-f"
         return EpisodeMetadata(
             scenario_id=self.scenario.scenario_id,
             mode=self.mode.value,
@@ -235,7 +238,7 @@ class Environment:
             variant=self.variant.value,
             preparation_turn_limit=min(12, max(0, self.scenario.agent_turn_limit - 12)),
             execution_turn_limit=min(12, self.scenario.agent_turn_limit),
-            protocol_version="vbc-5" if self.variant.structured else "baseline-phases-1",
+            protocol_version=protocol_version,
             requires={
                 job_id: list(record.job.requires)
                 for job_id, record in self._jobs.items()
@@ -315,6 +318,8 @@ class Environment:
             return self._refuse(agent_id, "finish", ToolStatus.FINISH_NOT_OPEN)
         if isinstance(action, SubmitJob) and self._now < self.submission_open_at[agent_id]:
             return self._submit(agent_id, action)
+        if isinstance(action, SendMessage) and self.variant.free_negotiation:
+            return self._send(agent_id, action)
         slot_actions = {
             "message_round": SendMessage | SkipRound,
             # Waiting in a plan slot keeps the last proposal or withholds confirmation.
@@ -402,6 +407,8 @@ class Environment:
             return "propose"
         if self.variant.structured and now == CONFIRM_TIME:
             return "confirm"
+        if self.variant.in_free_negotiation(now):
+            return "free_negotiation"
         if now >= self.config.submission_open_at:
             return "execution"
         if self.variant.slot_times and now >= self.variant.slot_times[0]:
@@ -409,8 +416,8 @@ class Environment:
         return "preparation"
 
     def take_inbox(self, agent_id: str, *, mark_read: bool = True) -> tuple[dict[str, Any], ...]:
-        """Show newly delivered messages in round protocols. read_messages() still returns them."""
-        if not self.variant.round_times:
+        """Show newly delivered messages in structured negotiations and scheduled rounds."""
+        if not (self.variant.round_times or self.variant.free_negotiation):
             return ()
         surfaced = self._surfaced[agent_id]
         messages = [m for m in self._inboxes[agent_id] if m.message_id not in surfaced]
@@ -628,6 +635,8 @@ class Environment:
     def _send(self, agent_id: str, action: SendMessage) -> ToolResult:
         if not self.mode.messaging:
             return self._refuse(agent_id, "send_message", ToolStatus.MESSAGING_DISABLED)
+        if self.variant.free_negotiation and not self.variant.in_free_negotiation(self._now):
+            return self._refuse(agent_id, "send_message", ToolStatus.MESSAGING_CLOSED)
         if action.to == agent_id or action.to not in self._inboxes:
             return self._refuse(agent_id, "send_message", ToolStatus.INVALID_RECIPIENT)
         if self._now >= self.config.submission_open_at:
@@ -665,7 +674,7 @@ class Environment:
     def _read(self, agent_id: str) -> ToolResult:
         if not self.mode.messaging:
             return self._refuse(agent_id, "read_messages", ToolStatus.MESSAGING_DISABLED)
-        if self.variant.comm is not Comm.F:
+        if self.variant.comm is not Comm.F and not self.variant.in_free_negotiation(self._now):
             return self._refuse(agent_id, "read_messages", ToolStatus.WRONG_PHASE)
         messages = [
             {"from": m.sender, "text": m.text, "sent_at": m.sent_at}
@@ -943,12 +952,11 @@ class Environment:
             agent_id=message.recipient,
             detail={"message_id": message.message_id, "from": message.sender},
         )
-        # Round protocols surface messages at the next slot, so delivery does not spend a turn.
+        # Only a delivery during free exchange interrupts a wait.
         if (
-            self.variant.comm is Comm.F
-            and self._now < self.config.submission_open_at
-            and self._waiting.pop(message.recipient, None) is not None
-        ):
+            (self.variant.comm is Comm.F and self._now < self.config.submission_open_at)
+            or self.variant.in_free_negotiation(self._now)
+        ) and self._waiting.pop(message.recipient, None) is not None:
             self._record("wake", "message", agent_id=message.recipient)
 
     def _new_request_id(self, agent_id: str) -> str:

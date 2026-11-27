@@ -7,6 +7,7 @@ import pytest
 
 from project_d.agents.llm_client import ChatResponse, LLMConfig
 from project_d.agents.prompts import PROMPT_VERSION
+from project_d.environment.model import load_scenario
 from project_d.experiments.matrix import (
     DATA_ROOT,
     build_matrix,
@@ -31,14 +32,38 @@ class FinishClient:
     ("series", "episodes"),
     [("E1", 680), ("E2", 1344), ("E3", 240), ("E4-H1", 144), ("E4-delay", 96)],
 )
-def test_matrix_sizes_match_plan(series: str, episodes: int) -> None:
+def test_matrix_sizes_match_plan(series: str, episodes: int, capsys) -> None:
     specs = build_matrix(series, load_manifest(ROOT))
     assert len(specs) == episodes
     assert len({spec.name for spec in specs}) == episodes
+    assert main([series, "--data-root", str(ROOT), "--dry-run"]) == 0
+    assert capsys.readouterr().out == json.dumps({"series": series, "episodes": episodes}) + "\n"
 
 
-def test_dev_series_never_uses_test_profiles() -> None:
-    assert {s.split for s in build_matrix("E1", load_manifest(ROOT))} == {"dev"}
+@pytest.mark.parametrize(("series", "episodes"), [("E1", 680), ("E5-dev", 40)])
+def test_dev_series_never_uses_test_profiles(series: str, episodes: int) -> None:
+    specs = build_matrix(series, load_manifest(ROOT))
+    assert {s.split for s in specs} == {"dev"}
+    assert len(specs) == episodes
+    if series == "E5-dev":
+        assert len({spec.profile for spec in specs}) == 10
+        assert {spec.variant for spec in specs} == {"A/VBC-F"}
+
+
+def test_e5_pairs_with_e2_vbc() -> None:
+    manifest = load_manifest(ROOT)
+    e2 = {(s.profile, s.repeat): s for s in build_matrix("E2", manifest) if s.variant == "A/VBC"}
+    e5 = {(s.profile, s.repeat): s for s in build_matrix("E5", manifest)}
+    assert len(e5) == 112
+    assert e2.keys() == e5.keys()
+    for key, spec in e5.items():
+        scenario = load_scenario(ROOT / spec.profile)
+        config, paired = spec.run_config(scenario), e2[key].run_config(scenario)
+        assert spec.variant == "A/VBC-F"
+        assert config.first_agent == paired.first_agent
+        assert config.role_swap == paired.role_swap
+        assert config.environment_seed == paired.environment_seed
+        assert config.apply(scenario) == paired.apply(scenario)
 
 
 def test_diagnostic_selection_has_exactly_fifty_episodes(capsys) -> None:
@@ -63,9 +88,10 @@ def test_diagnostic_selection_has_exactly_fifty_episodes(capsys) -> None:
     assert json.loads(capsys.readouterr().out)["episodes"] == 50
 
 
-def test_test_split_requires_explicit_full_run(capsys) -> None:
-    assert main(["E2", "--data-root", str(ROOT)]) == 2
-    assert main(["E2", "--data-root", str(ROOT), "--allow-test", "--repeats", "1"]) == 2
+@pytest.mark.parametrize("series", ["E2", "E5"])
+def test_test_split_requires_explicit_full_run(series, capsys) -> None:
+    assert main([series, "--data-root", str(ROOT)]) == 2
+    assert main([series, "--data-root", str(ROOT), "--allow-test", "--repeats", "1"]) == 2
     assert "full series" in capsys.readouterr().err
 
 

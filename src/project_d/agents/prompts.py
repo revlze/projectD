@@ -10,9 +10,20 @@ import hashlib
 import json
 from typing import Any
 
-from project_d.environment.model import AgentSpec, Comm, Variant
+from project_d.environment.model import (
+    FREE_NEGOTIATION_END,
+    PROPOSE_TIMES,
+    AgentSpec,
+    Comm,
+    Variant,
+)
 
 PROMPT_VERSION = "phases-6-vbc"
+
+FREE_NEGOTIATION_NOTE = (
+    f"Открыто окно свободных переговоров до t={FREE_NEGOTIATION_END} включительно. "
+    f"В t={PROPOSE_TIMES[1]} откроется фаза пересмотра."
+)
 
 BASE = (
     "Ты автономный агент и представляешь своего пользователя. Выполняй наиболее важные для "
@@ -99,7 +110,18 @@ def build_protocol_prompt(
         "подготовка, а не отказ от работ. Заявку, отклонённую как submission_not_open, повтори "
         f"после {submission_open_at}.",
     ]
-    if variant.structured:
+    if variant.free_negotiation:
+        lines.append(
+            f"Другой агент: {other_agent}. Фазы предложения, пересмотра и подтверждения "
+            "открывает среда и сообщает, какой вызов доступен. Стоимость вариантов в общем "
+            "плане подставляет среда по каталогу. После публикации первой версии плана до "
+            f"t={FREE_NEGOTIATION_END} включительно можешь свободно обмениваться сообщениями "
+            "с другим агентом. Сообщения приходят с задержкой, не резервируют кредиты и не "
+            f"являются обязательством. В t={PROPOSE_TIMES[1]} откроется фаза пересмотра."
+        )
+        lines.append(PLAN_INSTRUCTION.replace("доступных раундах", "окне свободных переговоров"))
+        lines.append(GUARD_RULE)
+    elif variant.structured:
         lines.append(plan_mechanics(other_agent))
         lines.append(PLAN_INSTRUCTION)
         if variant.guard:

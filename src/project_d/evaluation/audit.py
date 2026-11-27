@@ -45,7 +45,7 @@ class AuditReport:
 
 
 # Protocol versions in which propose_plan drops chosen options from the alternatives.
-NORMALIZING_VERSIONS = ("vbc-4", "vbc-5")
+NORMALIZING_VERSIONS = ("vbc-4", "vbc-5", "vbc-5-f")
 
 
 def _catalog_option(metadata: EpisodeMetadata, entry: LogEntry) -> dict[str, int] | None:
@@ -123,6 +123,7 @@ class _ScheduleAudit:
         self.sends: dict[int, LogEntry] = {}
         self.delivered: set[int] = set()
         self.inbox: dict[str, list[int]] = {agent: [] for agent in self.agents}
+        self.shown_messages: set[int] = set()
         self.round_participation: set[tuple[str, int]] = set()
         self.round_misses: set[tuple[str, int]] = set()
         self.last_action: LogEntry | None = None
@@ -130,6 +131,13 @@ class _ScheduleAudit:
     def observe(self, entry: LogEntry, where: str) -> None:
         event, time, agent = entry.event_type, entry.time, entry.agent_id or ""
         key = (agent, time)
+        if self.variant.free_negotiation:
+            if event == "send_message":
+                closed = entry.result == "messaging_closed"
+                if closed == self.variant.in_free_negotiation(time) or "round" in entry.detail:
+                    self.issues.append(f"{where}: invalid message send or delivery schedule")
+            elif event in ("round_missed", "round_skipped"):
+                self.issues.append(f"{where}: round event in the free negotiation protocol")
         if not self.scheduled:
             return
         if event == "decision":
@@ -138,7 +146,9 @@ class _ScheduleAudit:
             self.decisions.add(key)
             if agent in self.finished or not self._decision_window(time):
                 self.issues.append(f"{where}: decision outside its phase or after finish")
-            if self.variant.round_times and self.inbox.get(agent):
+            if (self.variant.round_times or self.variant.free_negotiation) and any(
+                message_id not in self.shown_messages for message_id in self.inbox.get(agent, ())
+            ):
                 self.issues.append(f"{where}: delivered messages not shown at decision")
         elif event in _ACTIONS:
             if agent not in self.agents:
@@ -169,7 +179,11 @@ class _ScheduleAudit:
     def _decision_window(self, time: int) -> bool:
         slots = self.variant.slot_times
         return time < self.metadata.horizon and (
-            not slots or time < slots[0] or time in slots or time >= self.opens_at
+            not slots
+            or time < slots[0]
+            or time in slots
+            or time >= self.opens_at
+            or self.variant.in_free_negotiation(time)
         )
 
     def _action(self, entry: LogEntry, where: str, key: tuple[str, int]) -> None:
@@ -202,6 +216,8 @@ class _ScheduleAudit:
             or (early and event in ("submit", "submit_replayed"))
             or (early and event == "finish" and result == "finish_not_open")
         )
+        if self.variant.free_negotiation and event == "send_message":
+            exceptional |= result == "messaging_closed"
         if slot and event not in _SLOT_ACTIONS[slot] and not exceptional:
             self.issues.append(f"{where}: action is not allowed in the {slot} slot")
         if event == "finish" and result != ("finish_not_open" if early else "ok"):
@@ -271,16 +287,25 @@ class _ScheduleAudit:
         agent = entry.agent_id or ""
         automatic = entry.event_type == "message_read"
         inbox = self.inbox.get(agent)
+        permitted = bool(self.variant.round_times) if automatic else self.variant.comm is Comm.F
+        if self.variant.free_negotiation:
+            permitted = automatic or self.variant.in_free_negotiation(entry.time)
+        expected = inbox
+        if automatic and self.variant.free_negotiation and inbox is not None:
+            expected = [message_id for message_id in inbox if message_id not in self.shown_messages]
         if (
-            not (self.variant.round_times if automatic else self.variant.comm is Comm.F)
+            not permitted
             or inbox is None
             or entry.result != "ok"
-            or entry.detail.get("message_ids") != inbox
-            or (automatic and (not inbox or (agent, entry.time) in self.decisions))
+            or entry.detail.get("message_ids") != expected
+            or (automatic and (not expected or (agent, entry.time) in self.decisions))
         ):
             self.issues.append(f"{where}: message shown before delivery or to the wrong owner")
             return
-        inbox.clear()
+        if automatic and self.variant.free_negotiation:
+            self.shown_messages.update(expected)
+        else:
+            inbox.clear()
 
     def finish(self) -> None:
         for message_id, sent in self.sends.items():

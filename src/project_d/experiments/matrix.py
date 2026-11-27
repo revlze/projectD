@@ -1,4 +1,4 @@
-"""Experiment matrix E0-E4 (docs/experiments.md, section 3) and its resumable runner."""
+"""Experiment matrix E0-E5 (docs/experiments.md, section 3) and its resumable runner."""
 
 from __future__ import annotations
 
@@ -78,7 +78,7 @@ E4_DELAY_VARIANTS = ("A/R3P", "A/VBC")
 E4_DELAYS = (4, 8)
 E4_COMMIT_DELAYS = (0, 1, 3)
 E4_START_GAPS = (0, 2, 4)
-SERIES = ("E1", "E2", "E3", "E4-H1", "E4-delay")
+SERIES = ("E1", "E2", "E3", "E4-H1", "E4-delay", "E5", "E5-dev")
 
 
 @dataclass(frozen=True)
@@ -172,6 +172,8 @@ def build_matrix(series: str, manifest: dict[str, Any]) -> list[EpisodeSpec]:
                     s4, E4_DELAY_VARIANTS, E4_DELAYS, repeats
                 )
             ]
+        case "E5" | "E5-dev":
+            return grid(split["test" if series == "E5" else "dev"], ("A/VBC-F",))
     raise ValueError(f"unknown series {series!r}")
 
 
@@ -500,6 +502,10 @@ def run_specs(
                 )
             },
         }
+        if config.variant.free_negotiation:
+            identities[spec.name]["tools_sha256"]["free_negotiation"] = fingerprint(
+                tool_schemas(config.variant, "free_negotiation")
+            )
     identity = {
         "schema_version": 2,
         "runtime": run_identity,
@@ -657,7 +663,8 @@ def main(argv: list[str] | None = None) -> int:
         specs = [s for s in specs if Path(s.profile).stem in wanted]
     if args.variants:
         wanted = set(args.variants.split(","))
-        if not wanted <= set(E1_VARIANTS):
+        available = set(E1_VARIANTS) | {spec.variant for spec in specs}
+        if not wanted <= available:
             print("Unknown variant selection.", file=sys.stderr)
             return 2
         specs = [s for s in specs if s.variant in wanted]

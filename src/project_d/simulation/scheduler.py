@@ -105,7 +105,7 @@ def run_episode(
     last_results: dict[str, ToolResult | None] = dict.fromkeys(env.processing_order)
     calls: list[ToolCall] = []
     previous_phases: dict[str, str | None] = dict.fromkeys(env.processing_order)
-    scheduled = sorted(set(env.variant.wake_times) - {config.submission_open_at})
+    scheduled = env.variant.slot_times
 
     def snapshot() -> EpisodeResult:
         return EpisodeResult(
@@ -196,7 +196,7 @@ def run_episode(
             calls.append(ToolCall(time, agent_id, decisions[agent_id], result))
             if time in env.variant.slot_times:
                 target = next(
-                    (slot for slot in env.variant.slot_times if slot > time),
+                    (wake for wake in env.variant.wake_times if wake > time),
                     config.submission_open_at,
                 )
                 env.suspend_until(agent_id, target, "between_rounds")

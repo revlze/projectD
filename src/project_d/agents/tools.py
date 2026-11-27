@@ -155,9 +155,11 @@ def tool_schemas(variant: Variant, phase: str | None = None) -> list[dict[str, A
         allowed = {"propose_plan", "wait_until"}
     elif phase == "confirm":
         allowed = {"confirm_plan", "wait_until"}
-    elif phase in ("preparation", "execution_wait"):
+    elif phase in ("preparation", "execution_wait") or (
+        phase == "free_negotiation" and variant.free_negotiation
+    ):
         allowed = {"list_jobs", "get_balance", "get_status", "wait_until"}
-        if variant.comm is Comm.F:
+        if variant.comm is Comm.F or phase == "free_negotiation":
             allowed |= {"send_message", "read_messages"}
     elif phase == "execution":
         allowed = {"list_jobs", "get_balance", "get_status", "wait_until", "submit_job", "finish"}

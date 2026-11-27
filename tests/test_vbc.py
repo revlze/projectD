@@ -10,15 +10,18 @@ from pathlib import Path
 import pytest
 
 from project_d.agents.plan_text import credits, render_plan
-from project_d.agents.prompts import build_protocol_prompt, prompt_sha256
+from project_d.agents.prompts import FREE_NEGOTIATION_NOTE, build_protocol_prompt, prompt_sha256
 from project_d.agents.runner import run_llm_episode
+from project_d.agents.tools import tool_schemas
 from project_d.environment.actions import (
     ConfirmPlan,
     GetStatus,
     ProposePlan,
+    ReadMessages,
     SendMessage,
     SubmitJob,
     ToolStatus,
+    WaitUntil,
 )
 from project_d.environment.env import PLAN_ERROR_TEXT, REMOVED_ALTERNATIVES_TEXT, Environment
 from project_d.environment.model import (
@@ -30,7 +33,7 @@ from project_d.environment.model import (
     load_scenario,
 )
 from project_d.evaluation.audit import audit_episode
-from project_d.evaluation.metrics import agreement_metrics
+from project_d.evaluation.metrics import agreement_metrics, root_conflict
 from project_d.experiments.matrix import BASELINE_VARIANTS, DATA_ROOT
 from project_d.simulation.scheduler import Observation, ScriptedPolicy, run_episode
 from support import make_scenario
@@ -858,3 +861,134 @@ def test_audit_rebuilds_every_field_of_v() -> None:
             result, lambda log, r, f=forged: [*log[:index], r(row, detail=f), *log[index + 1 :]]
         )
         assert any("V feedback differs" in issue for issue in issues), field
+
+
+def test_vbc_f_phase_edges_and_tool_availability() -> None:
+    config = RunConfig.for_protocol("A/VBC-F")
+    variant = config.variant
+    assert variant.value == "A/VBC-F"
+    assert variant.structured and variant.reserves and variant.verify and variant.guard
+    assert variant.slot_times == (6, 33, 37)
+    assert variant.round_times == ()
+    env = Environment(_scenario(), config)
+    assert env.metadata.protocol_version == "vbc-5-f"
+    for time, phase in (
+        (5, "preparation"),
+        (6, "propose"),
+        (7, "negotiation_wait"),
+        (8, "free_negotiation"),
+        (13, "free_negotiation"),
+        (32, "free_negotiation"),
+        (33, "propose"),
+        (34, "negotiation_wait"),
+        (37, "confirm"),
+        (40, "execution"),
+    ):
+        env.advance_to(time)
+        assert env.phase() == phase
+        status = ToolStatus.OK if phase == "free_negotiation" else ToolStatus.MESSAGING_CLOSED
+        assert env.execute("A", SendMessage("B", "proposal")).status == status
+        if phase == "free_negotiation":
+            assert env.execute("A", ProposePlan(())).status == ToolStatus.WRONG_PHASE
+            assert env.execute("A", ConfirmPlan(1)).status == ToolStatus.WRONG_PHASE
+    assert tool_schemas(variant, "free_negotiation") == tool_schemas(
+        Variant.parse("A/F"), "preparation"
+    )
+
+
+def test_vbc_f_reserves_all_slots_under_turn_pressure() -> None:
+    steps = {time: GetStatus() for time in (*range(6), *range(8, 33))}
+    a, b = (
+        Watcher(steps | {6: ProposePlan(()), 33: ProposePlan(()), 37: ConfirmPlan(2)})
+        for _ in range(2)
+    )
+    result = run_episode(_scenario(), RunConfig.for_protocol("A/VBC-F"), {"A": a, "B": b})
+    for watcher in (a, b):
+        assert [t for t in watcher.seen if t < 40] == [*range(7), 8, 9, 10, 33, 37]
+        assert watcher.seen[8].phase_started
+        assert not watcher.seen[9].phase_started
+        assert watcher.seen[33].preparation_turns_remaining == 2
+        assert watcher.seen[37].preparation_turns_remaining == 1
+    assert audit_episode(result.metadata, result.log, require_complete=True).consistent
+
+
+@pytest.mark.parametrize("delay", [1, 4])
+def test_vbc_f_scripted_journal_deliveries_agreement_and_audit(delay: int) -> None:
+    scenario = _scenario(budget=7, message_delay=delay)
+    a = Watcher(
+        {
+            6: ProposePlan((A_FULL,), (A_FULL, A_SHORT)),
+            8: SendMessage("B", "opening offer"),
+            32: SendMessage("B", "final offer"),
+            33: SendMessage("B", "closed"),
+            37: ConfirmPlan(2),
+            40: SubmitJob(*A_SHORT),
+            41: SubmitJob(*A_FULL),
+        }
+    )
+    b = Watcher(
+        {
+            6: ProposePlan((B_STANDARD,)),
+            8: WaitUntil(80),
+            8 + delay: ReadMessages(),
+            33: ProposePlan((B_STANDARD,)),
+            37: ConfirmPlan(2),
+            41: SubmitJob(*B_STANDARD),
+        }
+    )
+    result = run_episode(scenario, RunConfig.for_protocol("A/VBC-F"), {"A": a, "B": b})
+    assert a.seen[8].plan_view["plan_feedback"]["overage"] == 6
+    assert b.seen[33].plan_view["plan_version"] == 1
+    assert b.seen[8 + delay].inbox[0]["text"] == "opening offer"
+    read = next(call for call in result.calls if isinstance(call.action, ReadMessages))
+    assert read.result.data["messages"] == list(b.seen[8 + delay].inbox)
+    late_turn = 33 if delay == 1 else 37
+    assert b.seen[late_turn].inbox[0]["sent_at"] == 32
+    assert b.seen[late_turn].inbox[0]["text"] == "final offer"
+    assert [entry.result for entry in _events(result, "send_message")] == [
+        "ok",
+        "ok",
+        "messaging_closed",
+    ]
+    assert not any(entry.event_type.startswith("round_") for entry in result.log)
+    audit = audit_episode(result.metadata, result.log, require_complete=True)
+    assert audit.consistent, audit.issues
+    assert audit.agreement == "agreed"
+    agreement = agreement_metrics(result.log, scenario.budget)
+    assert agreement.agreed_over_budget and agreement.off_plan_attempts == 1
+    roots = root_conflict(scenario, result.metadata, result.log)
+    assert roots.outcomes == {"A": "completed", "B": "budget_refused"}
+    index = result.log.index(_events(result, "send_message")[1])
+    issues = _forged(
+        result, lambda log, r: [*log[:index], r(log[index], time=33), *log[index + 1 :]]
+    )
+    assert any("invalid message send or delivery schedule" in issue for issue in issues)
+
+
+def test_vbc_f_instructions_appear_only_for_the_new_variant() -> None:
+    class WindowClient(PlanningClient):
+        def chat(self, messages, tools):
+            if "logical_time=8;" in messages[-1]["content"]:
+                return response("get_status")
+            return super().chat(messages, tools)
+
+    scenario = _scenario()
+    free = run_llm_episode(scenario, RunConfig.for_protocol("A/VBC-F"), WindowClient())
+    assert free.failure is None
+    assert audit_episode(free.result.metadata, free.result.log, require_complete=True).consistent
+    for turn in free.turns:
+        prompt, *_, observation = turn.request["messages"]
+        assert "до t=32 включительно можешь свободно обмениваться сообщениями" in prompt["content"]
+        assert (FREE_NEGOTIATION_NOTE in observation["content"]) == (turn.logical_time == 8)
+    assert {
+        (turn.logical_time, turn.shown_plan["plan_version"])
+        for turn in free.turns
+        if turn.shown_plan is not None
+    } == {(8, 1), (37, 2)}
+    shown = [(turn.agent_id, turn.logical_time, turn.shown_plan) for turn in free.turns]
+    assert agreement_metrics(free.result.log, scenario.budget, shown).v_warned_agents == 2
+    for name in (*STRUCTURED, *BASELINE_VARIANTS):
+        prompt = build_protocol_prompt(scenario.agents[0], "B", Variant.parse(name), 40)
+        assert "до t=32" not in prompt
+    old = run_llm_episode(scenario, RunConfig.for_protocol("A/VBC"), PlanningClient())
+    assert all(FREE_NEGOTIATION_NOTE not in t.request["messages"][-1]["content"] for t in old.turns)

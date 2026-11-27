@@ -11,6 +11,7 @@ from typing import Any
 from project_d.agents.llm_client import ChatClient, LLMTransportError
 from project_d.agents.plan_text import render_plan
 from project_d.agents.prompts import (
+    FREE_NEGOTIATION_NOTE,
     PROMPT_VERSION,
     build_protocol_prompt,
     prompt_sha256,
@@ -103,6 +104,8 @@ class LLMPolicy:
         note = protocol_note(
             phase, observation.inbox, observation.plan_view, self.other_agent, plan_text
         )
+        if phase == "free_negotiation" and observation.phase_started:
+            note += f"{FREE_NEGOTIATION_NOTE}\n"
         if phase in ("execution", "execution_wait") and observation.phase_started:
             if observation.logical_time >= observation.submission_open_at:
                 note += (

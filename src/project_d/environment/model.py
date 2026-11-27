@@ -21,6 +21,8 @@ PROPOSE_TIMES = (6, 33)
 SNAPSHOT_TIMES = (7, 35)
 FEEDBACK_TIMES = (7, 35)
 VBC_ROUND_TIMES = (13, 20)
+FREE_NEGOTIATION_START = 8
+FREE_NEGOTIATION_END = 32
 CONFIRM_TIME = 37
 
 
@@ -39,8 +41,8 @@ class Comm(StrEnum):
 
 _VARIANT_RE = re.compile(r"^(U|A)/(N|F|R1|R3P|R3)$")
 
-# The structured protocols: (execution, verify, guard, negotiation rounds). U/VBC is full VBC
-# without reservation, the U/A pair for H3; its ablations run only with A.
+# The structured protocols: (execution, verify, guard, negotiation rounds).
+# A/VBC-F uses a free negotiation window instead of a round count.
 _STRUCTURED = {
     "A/S": ("A", False, False, 1),
     "A/S+V": ("A", True, False, 1),
@@ -49,6 +51,7 @@ _STRUCTURED = {
     "A/VBC-r0": ("A", True, True, 0),
     "A/VBC-r2": ("A", True, True, 2),
     "U/VBC": ("U", True, True, 1),
+    "A/VBC-F": ("A", True, True, None),
 }
 
 
@@ -66,7 +69,7 @@ class Variant:
     structured: bool = False
     verify: bool = False
     guard: bool = False
-    rounds: int = 0
+    rounds: int | None = 0
 
     def __post_init__(self) -> None:
         if self.execution not in ("U", "A"):
@@ -94,7 +97,7 @@ class Variant:
         return cls(match.group(1), Comm(match.group(2)))
 
     @property
-    def _structured_key(self) -> tuple[str, bool, bool, int]:
+    def _structured_key(self) -> tuple[str, bool, bool, int | None]:
         return (self.execution, self.verify, self.guard, self.rounds)
 
     @property
@@ -109,9 +112,16 @@ class Variant:
         return self.execution == "A"
 
     @property
+    def free_negotiation(self) -> bool:
+        return self.structured and self.rounds is None
+
+    def in_free_negotiation(self, time: int) -> bool:
+        return self.free_negotiation and FREE_NEGOTIATION_START <= time <= FREE_NEGOTIATION_END
+
+    @property
     def messaging(self) -> bool:
         if self.structured:
-            return self.rounds > 0
+            return self.free_negotiation or bool(self.rounds)
         return self.comm is not Comm.N
 
     @property
@@ -121,7 +131,7 @@ class Variant:
         if self.comm in (Comm.R3, Comm.R3P):
             return ROUND_TIMES
         if self.structured:
-            return VBC_ROUND_TIMES[: self.rounds]
+            return VBC_ROUND_TIMES[: self.rounds or 0]
         return ()
 
     @property
@@ -137,7 +147,8 @@ class Variant:
         if not self.slot_times:
             return ()
         # The wake at opening gives every slot protocol a turn after late deliveries.
-        return (*self.slot_times, PROTOCOL_SUBMISSION_OPEN_AT)
+        window_open = (FREE_NEGOTIATION_START,) if self.free_negotiation else ()
+        return tuple(sorted((*self.slot_times, *window_open, PROTOCOL_SUBMISSION_OPEN_AT)))
 
 
 class JobStatus(StrEnum):
