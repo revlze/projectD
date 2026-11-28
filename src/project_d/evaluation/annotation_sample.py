@@ -1,6 +1,6 @@
-"""Manual-annotation sample for free and structured messages (docs/experiments.md, section 4).
+"""Annotation CLI. Use `prepare`, `batch`, `import`, `status`, `verify` or `merge`.
 
-Usage: python -m project_d.evaluation.annotation_sample <test results dir> --out <dir>
+Legacy usage: python -m project_d.evaluation.annotation_sample <test results dir> --out <dir>
 
 The sample is fixed before reading any transcript: the 12 `e3_subset` profiles, repeat 0,
 the eight communicating baselines and A/VBC, all from E2 (108 episodes). For each episode it
@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import sys
 from pathlib import Path
 
 from project_d.environment.model import load_scenario
@@ -113,10 +114,25 @@ def transcript(path: Path) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    args_in = sys.argv[1:] if argv is None else argv
+    if args_in and args_in[0] in (
+        "prepare",
+        "batch",
+        "import",
+        "import-legacy",
+        "status",
+        "verify",
+        "merge",
+    ):
+        from project_d.evaluation.annotation_workflow import main as workflow
+
+        return workflow(args_in)
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("results", type=Path)
     parser.add_argument("--out", type=Path, required=True)
-    args = parser.parse_args(argv)
+    args = parser.parse_args(args_in)
+    if (args.out / "sample_identity.json").exists():
+        parser.error("Legacy export requires a scratch directory outside the prepared annotation.")
     transcripts = args.out / "transcripts"
     transcripts.mkdir(parents=True, exist_ok=True)
     rows = []
