@@ -74,6 +74,8 @@ jobs:
           timeout 60 bash -c 'until curl -sf http://localhost:9009/.well-known/agent-card.json >/dev/null; do sleep 1; done'
           curl -s http://localhost:9009/.well-known/agent-card.json | jq .
 
+      - uses: astral-sh/setup-uv@v6
+
       - name: A2A conformance tests (green-agent-template)
         run: |
           git clone --quiet https://github.com/RDI-Foundation/green-agent-template.git template
