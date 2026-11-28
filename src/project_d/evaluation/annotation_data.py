@@ -48,7 +48,7 @@ def json_text(value: Any) -> str:
 
 def read_jsonl(path: Path) -> list[dict]:
     records = []
-    for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+    for number, line in enumerate(path.read_text(encoding="utf-8-sig").split("\n"), 1):
         if line.strip():
             try:
                 record = json.loads(line)

@@ -321,7 +321,8 @@ def validate_response(record: dict, tasks: dict[str, dict]) -> dict:
         raise ValueError(f"{episode}: provenance must use nonempty strings or 'unknown'")
     if provenance["date"] != "unknown":
         try:
-            date.fromisoformat(provenance["date"])
+            if date.fromisoformat(provenance["date"]).isoformat() != provenance["date"]:
+                raise ValueError("expected YYYY-MM-DD")
         except ValueError as exc:
             raise ValueError(f"{episode}: expected ISO date or 'unknown'") from exc
     labels = record["labels"]
@@ -353,7 +354,15 @@ def _read_responses(paths: list[Path], tasks: dict[str, dict]) -> dict[str, dict
 
 
 def imported(out: Path, tasks: dict[str, dict]) -> dict[str, dict]:
-    return _read_responses(sorted((out / "llm/responses/imported").glob("*.jsonl")), tasks)
+    return _read_responses(_archive_files(out), tasks)
+
+
+def _archive_files(out: Path) -> list[Path]:
+    paths = sorted((out / "llm/responses/imported").glob("*.jsonl"))
+    for path in paths:
+        if path.stem != digest(path.read_bytes()):
+            raise ValueError(f"{path}: original response archive checksum differs")
+    return paths
 
 
 def flat_labels(
@@ -398,7 +407,9 @@ def import_answers(out: Path, tasks: dict[str, dict], paths: list[Path]) -> None
     ]
     if len(pending) != len(paths):
         print("Previously imported identical files were kept unchanged.")
-    combined = _read_responses([*sorted(target.glob("*.jsonl")), *pending], tasks)
+    combined = _read_responses([*_archive_files(out), *pending], tasks)
+    if any(path.read_bytes() != raw[path] for path in pending):
+        raise ValueError("A response file changed during import")
     for path in pending:
         content = raw[path]
         _replace(target / f"{digest(content)}.jsonl", content)
