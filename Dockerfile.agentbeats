@@ -1,0 +1,27 @@
+# One image for both AgentBeats agents; AGENT_ROLE selects green (assessor) or purple (baseline).
+FROM ghcr.io/astral-sh/uv:0.12.19-python3.13-trixie-slim
+
+ARG AGENT_ROLE=green
+ENV AGENT_ROLE=${AGENT_ROLE} \
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+RUN useradd --create-home --uid 1000 agent
+USER agent
+WORKDIR /home/agent/app
+
+COPY --chown=agent pyproject.toml uv.lock README.md ./
+COPY --chown=agent src src
+RUN --mount=type=cache,target=/home/agent/.cache/uv,uid=1000 \
+    uv sync --locked --no-dev --group agentbeats
+
+COPY --chown=agent agentbeats agentbeats
+COPY --chown=agent data/scenarios data/scenarios
+
+# Fail the build if the frozen scenario set does not match its manifest.
+RUN uv run --no-sync python -c "from project_d.experiments.generator import validate_dataset; validate_dataset('data/scenarios')"
+
+EXPOSE 9009
+ENTRYPOINT ["sh", "-c", "exec uv run --no-sync python -m agentbeats.$AGENT_ROLE \"$@\"", "--"]
+CMD ["--host", "0.0.0.0", "--port", "9009"]

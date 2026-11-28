@@ -1,0 +1,11 @@
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!src/
+!agentbeats/
+!data/scenarios/
+**/__pycache__
+**/*.pyc
+.env
+.env.*

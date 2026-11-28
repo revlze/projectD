@@ -1,0 +1,37 @@
+// Amber component manifest of the Project D green agent (assessor).
+// IMAGE is replaced by a pinned tag (sha-<commit>) when the leaderboard is set up.
+{
+  manifest_version: "0.1.0",
+  program: {
+    image: "ghcr.io/revlze/project-d-green:latest",
+    entrypoint: "uv run --no-sync python -m agentbeats.green --host 0.0.0.0 --port 9009",
+    env: {
+      // Participant URLs arrive over A2A; referencing the slot lets Amber route to the proxy.
+      PROXY_URL: "${slots.proxy.url}",
+    },
+    network: {
+      endpoints: [{ name: "endpoint", port: 9009 }],
+    },
+  },
+  config_schema: {
+    type: "object",
+    properties: {},
+    additionalProperties: false,
+  },
+  slots: {
+    proxy: { kind: "a2a" },
+  },
+  provides: {
+    a2a: { kind: "a2a", endpoint: "endpoint" },
+  },
+  exports: { a2a: "a2a" },
+  metadata: {
+    assessment_config: {
+      variants: ["U/F", "U/VBC", "A/F", "A/VBC"],
+      split: "test",
+      repeats: [0],
+      workers: 8,
+    },
+    participant_roles: ["agent", "peer"],
+  },
+}

@@ -11,6 +11,11 @@ requires = ["uv_build>=0.12.19,<0.13.0"]
 build-backend = "uv_build"
 
 [dependency-groups]
+agentbeats = [
+    "a2a-sdk[http-server]>=0.3.22,<0.4",
+    "httpx>=0.28",
+    "uvicorn>=0.38",
+]
 dev = [
     "pytest>=9.2.0",
     "ruff>=0.17.6",
@@ -18,12 +23,13 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-src = ["src", "tests"]
+src = ["src", "tests", "."]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]

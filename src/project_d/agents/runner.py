@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
@@ -243,17 +244,23 @@ class LLMEpisode:
     failure_kind: str | None = None
 
 
-def run_llm_episode(scenario: Scenario, config: RunConfig, client: ChatClient) -> LLMEpisode:
+def run_llm_episode(
+    scenario: Scenario, config: RunConfig, client: ChatClient | Mapping[str, ChatClient]
+) -> LLMEpisode:
+    """Run one episode; ``client`` is shared or given per agent id (e.g. remote agents)."""
     resolved = config.apply(scenario)
     ids = [agent.agent_id for agent in resolved.agents]
     opens = config.open_times(ids)
+    clients = client if isinstance(client, Mapping) else dict.fromkeys(ids, client)
+    if set(clients) != set(ids):
+        raise ValueError(f"clients must cover agents {ids}, got {sorted(clients)}")
     policies = {
         agent.agent_id: LLMPolicy(
             agent,
             next(other for other in ids if other != agent.agent_id),
             config.variant,
             opens[agent.agent_id],
-            client,
+            clients[agent.agent_id],
         )
         for agent in resolved.agents
     }

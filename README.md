@@ -73,6 +73,10 @@ Every series directory has a README with the exact run command, configuration an
 
 The remaining stages are negotiation annotation, AgentBeats, the research report and the defense.
 
+## External evaluation (AgentBeats)
+
+`agentbeats/` holds the green agent that serves this benchmark on [AgentBeats](https://agentbeats.dev/), the baseline purple agent, Docker images and Amber manifests; see [agentbeats/README.md](agentbeats/README.md).
+
 ## Reproducing the test analysis
 
 These steps make no model calls; they recompute everything from the committed journals and summaries:

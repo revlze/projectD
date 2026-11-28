@@ -1,0 +1,102 @@
+name: AgentBeats agents
+
+on:
+  push:
+    branches: [master]
+    tags: ["agentbeats-v*"]
+    paths:
+      - "agentbeats/**"
+      - "src/**"
+      - "data/scenarios/**"
+      - "tests/test_agentbeats.py"
+      - "Dockerfile.agentbeats"
+      - ".dockerignore"
+      - "pyproject.toml"
+      - "uv.lock"
+      - ".github/workflows/agentbeats.yml"
+  workflow_dispatch:
+
+env:
+  # Conformance tests of the official green-agent template, pinned.
+  TEMPLATE_SHA: 65e99ca88026ed46a8f2db1de1d334aadce20aa9
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked --group agentbeats
+      - run: uv run ruff check agentbeats tests/test_agentbeats.py
+      - run: uv run pytest -q tests/test_agentbeats.py
+
+  publish:
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        role: [green, purple]
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/project-d-${{ matrix.role }}
+          tags: |
+            type=sha,format=short
+            type=match,pattern=agentbeats-v(.*),group=1
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.agentbeats
+          build-args: AGENT_ROLE=${{ matrix.role }}
+          platforms: linux/amd64
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Start container
+        run: |
+          image=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          # The purple agent needs no key to start; conformance messages never reach the model.
+          docker run -d -p 9009:9009 --name agent "$image" --host 0.0.0.0 --port 9009 \
+            --card-url http://localhost:9009/
+          timeout 60 bash -c 'until curl -sf http://localhost:9009/.well-known/agent-card.json >/dev/null; do sleep 1; done'
+          curl -s http://localhost:9009/.well-known/agent-card.json | jq .
+
+      - name: A2A conformance tests (green-agent-template)
+        run: |
+          git clone --quiet https://github.com/RDI-Foundation/green-agent-template.git template
+          git -C template checkout --quiet "$TEMPLATE_SHA"
+          cd template
+          uvx --python 3.13 --with "a2a-sdk[http-server]==0.3.26" --with httpx --with pytest-asyncio \
+            pytest -q tests --agent-url http://localhost:9009
+
+      - name: Container logs
+        if: always()
+        run: docker logs agent || true
+
+      - name: Push
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          image="ghcr.io/${{ github.repository_owner }}/project-d-${{ matrix.role }}"
+          docker push --all-tags "${image,,}"
+          digest=$(docker image inspect "$(echo "${{ steps.meta.outputs.tags }}" | head -n1)" --format '{{index .RepoDigests 0}}')
+          {
+            echo "### ${{ matrix.role }}"
+            echo ""
+            echo "Tags: \`${{ steps.meta.outputs.tags }}\`"
+            echo ""
+            echo "Digest: \`${digest}\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,30 @@
+// Amber component manifest of the Project D baseline participant (purple agent).
+{
+  manifest_version: "0.1.0",
+  program: {
+    image: "ghcr.io/revlze/project-d-purple:latest",
+    entrypoint: "uv run --no-sync python -m agentbeats.purple --host 0.0.0.0 --port 9009",
+    env: {
+      LLM_API_KEY: "${config.llm_api_key}",
+      PURPLE_PROVIDER: "mistral",
+      PURPLE_MODEL: "deepseek-v4-1-flash-1017",
+      PURPLE_TEMPERATURE: "0.3",
+      PURPLE_REASONING_EFFORT: "none",
+    },
+    network: {
+      endpoints: [{ name: "endpoint", port: 9009 }],
+    },
+  },
+  config_schema: {
+    type: "object",
+    properties: {
+      llm_api_key: { type: "string", secret: true },
+    },
+    required: ["llm_api_key"],
+    additionalProperties: false,
+  },
+  provides: {
+    a2a: { kind: "a2a", endpoint: "endpoint" },
+  },
+  exports: { a2a: "a2a" },
+}
