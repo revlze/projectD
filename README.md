@@ -63,7 +63,7 @@ The research entrypoint is `project_d.experiments.matrix`. Test series require `
 | `results/e1-9e36e07` | Historical Mistral Small and DeepSeek E1 across 16 variants |
 | `results/test-32abf0e` | E2, E3, E4-H1 and E4-delay on `test`, 1824 episodes, one frozen configuration |
 | `results/test-32abf0e/analysis` | Paired bootstrap, family and profile tables, E3/E4 joins, plan metrics, root conflict, usage, figures |
-| `results/test-32abf0e/annotation` | Fixed 108-episode sample for manual annotation, with rules and empty sheets |
+| `results/test-32abf0e/annotation` | Fixed 108-episode annotation sample with rules and sheets; annotation is done by an LLM |
 | `results/e5-dev-6a5b6f70` | E5-dev, 40 diagnostic episodes of A/VBC-F on `dev` |
 | `results/e5-6a5b6f70` | E5, post-hoc exploratory: A/VBC-F on `test`, 112 episodes, compared with E2 on the same keys |
 
@@ -71,7 +71,7 @@ Every series directory has a README with the exact run command, configuration an
 
 [Formal validation](formal/tla/validation.md) is complete. TLC checked two pilot models and nine configurations of the extended U/A/G model, including `U/VBC`. The checks produced four expected counterexamples and seven successful exhaustive searches. Twelve Python control traces include replays of the key transitions of all three extended counterexamples. The verification covers enforcement while G is active, the conditions for releasing G, the fact that it stays released, and budget safety during fallback under A. These results apply to the checked finite abstraction and selected Python traces.
 
-The remaining stages are negotiation annotation, AgentBeats, the research report and the defense.
+The external AgentBeats submission is complete (see below). The remaining stages are LLM annotation of the negotiations, the research report and the defense.
 
 ## External evaluation (AgentBeats)
 
@@ -102,7 +102,7 @@ uv run python -m project_d.evaluation.e5_analysis results/e5-6a5b6f70/deepseek-v
   results/test-32abf0e/e2/deepseek-v4-1-flash-1017/summary.csv --out results/e5-6a5b6f70/analysis
 # requests and journals of recorded episodes rebuilt through the current code
 uv run python -m project_d.experiments.replay_check results/test-32abf0e/e2/deepseek-v4-1-flash-1017
-# transcripts for manual annotation in a scratch directory
+# transcripts of the annotation sample in a scratch directory
 uv run python -m project_d.evaluation.annotation_sample results/test-32abf0e --out outputs/annotation
 ```
 
