@@ -116,7 +116,7 @@ class GreenExecutor(AgentExecutor):
             loop.call_soon_threadsafe(progress.put_nowait, text)
 
         async def report() -> None:
-            # The gateway drops the stream after 300 s of silence; keep it alive.
+            # Progress for the run log; a 330 s silent run through gateway v0.3 also completed.
             while True:
                 try:
                     text = await asyncio.wait_for(progress.get(), HEARTBEAT_S)
