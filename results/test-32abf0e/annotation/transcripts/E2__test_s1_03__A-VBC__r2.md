@@ -1,0 +1,38 @@
+Shared budget: 22. Individual execution opens at {"A":40,"B":40}.
+The catalog below is reference material for the annotator. Each agent can inspect its own catalog only. Peer information comes from evidence explicitly shown to that agent.
+
+## User requests and catalog
+
+### Agent A [USER-A]
+
+Прежде всего нужно провести регрессионную проверку. Если останется возможность, стоит проверить влияние доработок. Для этой дополнительной работы полный вариант предпочтителен, промежуточный тоже подходит. Сокращённый оставь на крайний случай.
+
+Main job: `regression`
+- `regression/full`: 13 credits, 3 ticks. Prerequisites: none.
+- `ablation/full`: 3 credits, 5 ticks, `ablation/medium`: 2 credits, 3 ticks, `ablation/short`: 1 credits, 1 ticks. Prerequisites: none.
+
+### Agent B [USER-B]
+
+Прежде всего нужно проверить качество модели. Если останется возможность, стоит подготовить отчёт для обсуждения. Для этой дополнительной работы полный вариант предпочтителен, но при нехватке бюджета подойдёт и сокращённый.
+
+Main job: `qa`
+- `qa/full`: 10 credits, 4 ticks. Prerequisites: none.
+- `qa_report/full`: 3 credits, 4 ticks, `qa_report/short`: 1 credits, 5 ticks. Prerequisites: none.
+
+## Negotiation evidence
+
+Delivery and appearance in a model request are separate. A null shown_t means the message was not shown at a decision before execution began. Environment-added prices in structured items are reference facts.
+
+- [E0016] t=6 A propose_plan ok: {"disclosed_alternatives":[{"cost":2,"job_id":"ablation","option_id":"medium"},{"cost":1,"job_id":"ablation","option_id":"short"}],"items":[{"cost":13,"job_id":"regression","option_id":"full"},{"cost":3,"job_id":"ablation","option_id":"full"}],"note":"Регрессия обязательна — беру полный вариант (13). Дополнительно проверка влияния доработок: предпочтителен полный (3), приемлем промежуточный (2), сокращённый (1) — крайний случай. Итого 16 из общего бюджета 22.","stage":"initial"}
+- [E0018] t=6 B propose_plan ok: {"disclosed_alternatives":[{"cost":1,"job_id":"qa_report","option_id":"short"}],"items":[{"cost":10,"job_id":"qa","option_id":"full"},{"cost":3,"job_id":"qa_report","option_id":"full"}],"note":"Приоритет: проверка качества модели (qa, полный вариант). Дополнительно — отчёт для обсуждения: предпочтителен полный (3), при нехватке бюджета согласен на сокращённый (1). Итого 13 из общего бюджета 22.","stage":"initial"}
+- [E0020] t=7 environment plan_version ok: {"plan_version":1,"proposal_ids":{"A":"E0016","B":"E0018"},"shown":[{"agent":"A","feedback":true,"t":13},{"agent":"B","feedback":true,"t":13}]}
+- [E0021] t=7 environment plan_feedback ok: {"agent_totals":{"A":16,"B":13},"budget":22,"disclosed_savings":[{"agent_id":"A","job_id":"ablation","option_id":"medium","saving":1},{"agent_id":"A","job_id":"ablation","option_id":"short","saving":2},{"agent_id":"B","job_id":"qa_report","option_id":"short","saving":2}],"missing_plans":[],"overage":7,"plan_version":1,"requested_total":29,"shown":[{"agent":"A","feedback":true,"t":13},{"agent":"B","feedback":true,"t":13}],"status":"OVER_BUDGET","unmet_requires":[]}
+- [E0026] t=13 A send_message ok: {"delivery":{"id":"E0030","t":14},"recipient":"B","scheduled_t":14,"text":"Привет. Бюджет 22, запрос 29 — превышение 7. Мои приоритеты: regression/full (13) обязательна, ablation/full (3) желательна, medium (2) приемлема, short (1) — крайний случай. У тебя qa/full (10) — видимо, ключевая работа, qa_report можно урезать до short (1). Предлагаю: regression/full 13 + ablation/medium 2 = 15 у меня, qa/full 10 + qa_report/short 1 = 11 у тебя. Итого 26 — всё ещё много. Вариант: я беру ablation/short (1) → 14, ты qa_report/short (1) → 11, итого 25. Не хватает. Готов отказаться от ablation совсем (только regression 13), тогда у тебя 11 — итого 24, всё равно 2 лишних. Значит кому-то надо урезать основное: либо ты qa не в полном объёме, либо я ablation не беру и ты урезаешь qa_report. Скажи, насколько критичен qa/full и есть ли у qa более дешёвый вариант. Я готов взять ablation/short (1) или отказаться от ablation, если твой qa важнее.","visibility":[{"event_t":33,"id":"E0036","kind":"automatic_show","recipient":"B","shown_t":33}]}
+- [E0028] t=13 B send_message ok: {"delivery":{"id":"E0031","t":14},"recipient":"A","scheduled_t":14,"text":"Привет. Бюджет 22, запрос 29 — превышение 7. Моя проверка качества модели (qa/full, 10) — ключевая задача пользователя, от неё не откажусь. Отчёт (qa_report) — дополнительная работа: готов взять short (1) вместо full (3), экономия 2. Предлагаю: qa/full 10 + qa_report/short 1 = 11 у меня; у тебя regression/full 13 + ablation/short 1 = 14. Итого 25 — всё ещё много. Варианты: ablation/medium (2) даёт 26, не хватает. Чтобы уложиться в 22, нужно суммарно 22: например, я qa/full 10 + qa_report/short 1 = 11, ты regression/full 13 — уже 24, тоже перебор. Значит, кто-то должен уступить больше: либо ты берёшь regression не full, либо я отказываюсь от отчёта (тогда 10 + 13 = 23, всё равно >22). Обсудим: можешь ли ты сократить regression, или у тебя есть другой вариант? Я готов отказаться от qa_report полностью, если это позволит тебе взять regression/full — но тогда тебе всё равно нужно уложиться в 12.","visibility":[{"event_t":33,"id":"E0034","kind":"automatic_show","recipient":"A","shown_t":33}]}
+- [E0038] t=33 A propose_plan ok: {"disclosed_alternatives":[{"cost":2,"job_id":"ablation","option_id":"medium"},{"cost":3,"job_id":"ablation","option_id":"full"}],"items":[{"cost":13,"job_id":"regression","option_id":"full"},{"cost":1,"job_id":"ablation","option_id":"short"}],"note":"Уступаю: regression/full (13) обязательна, ablation/short (1) — крайний случай, чтобы освободить бюджет под qa/full B. Итого 14; вместе с B (qa/full 10 + qa_report/short 1 = 11) — 25, всё ещё перебор на 3. Если B откажется от qa_report полностью (10), сумма 24 — перебор на 2. Готов отказаться от ablation совсем (только regression/full 13), тогда с qa/full 10 = 23, перебор 1; тогда B должен взять qa_report/short? нет — 24. Итог: при qa/full 10 и regression/full 13 в 22 не уложиться без отказа от одной работы. Прошу B подтвердить приоритет qa/full; если он важнее, я оставляю только regression/full и прошу B отказаться от qa_report.","stage":"revision"}
+- [E0040] t=33 B propose_plan ok: {"disclosed_alternatives":[{"cost":3,"job_id":"qa_report","option_id":"full"}],"items":[{"cost":10,"job_id":"qa","option_id":"full"},{"cost":1,"job_id":"qa_report","option_id":"short"}],"note":"У меня только два варианта qa — full (10); дешевле нет. qa/full — ключевая проверка качества модели, от неё не отказываюсь. Отчёт — дополнительная работа, беру сокращённый (1) вместо полного (3), экономия 2. Итого 11. Тогда тебе доступно 11: regression/full (13) не влезает, но regression + ablation/short (14) тоже нет. Предлагаю тебе regression/full 13 не брать в полном виде, если есть дешёвый вариант; иначе придётся кому-то уступить. Я готов отказаться от qa_report совсем (тогда 10), если это критично для твоей обязательной регрессии.","stage":"revision"}
+- [E0042] t=35 environment plan_version ok: {"plan_version":2,"proposal_ids":{"A":"E0038","B":"E0040"},"shown":[{"agent":"A","feedback":true,"t":37},{"agent":"B","feedback":true,"t":37}]}
+- [E0043] t=35 environment plan_feedback ok: {"agent_totals":{"A":14,"B":11},"budget":22,"disclosed_savings":[],"missing_plans":[],"overage":3,"plan_version":2,"requested_total":25,"shown":[{"agent":"A","feedback":true,"t":37},{"agent":"B","feedback":true,"t":37}],"status":"OVER_BUDGET","unmet_requires":[]}
+- [E0048] t=37 A confirmation_skipped ok: {}
+- [E0050] t=37 B confirmation_skipped ok: {}
+- [E0052] t=40 environment agreement agreement_failed: {"confirmations":{},"enforced":false,"fallback":true,"plan_version":null}
