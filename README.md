@@ -63,7 +63,7 @@ The research entrypoint is `project_d.experiments.matrix`. Test series require `
 | `results/e1-9e36e07` | Historical Mistral Small and DeepSeek E1 across 16 variants |
 | `results/test-32abf0e` | E2, E3, E4-H1 and E4-delay on `test`, 1824 episodes, one frozen configuration |
 | `results/test-32abf0e/analysis` | Paired bootstrap, family and profile tables, E3/E4 joins, plan metrics, root conflict, usage, figures |
-| `results/test-32abf0e/annotation` | Fixed 108-episode annotation sample with rules and sheets; annotation is done by an LLM |
+| [`results/test-32abf0e/annotation`](results/test-32abf0e/annotation) | 213 unique negotiation episodes for LLM-assisted annotation with human verification. The original E2 sample has 108 episodes, the E5 extension has 12, and the targeted conflict sample has 108, including 15 shared episodes. |
 | `results/e5-dev-6a5b6f70` | E5-dev, 40 diagnostic episodes of A/VBC-F on `dev` |
 | `results/e5-6a5b6f70` | E5, post-hoc exploratory: A/VBC-F on `test`, 112 episodes, compared with E2 on the same keys |
 
@@ -71,7 +71,7 @@ Every series directory has a README with the exact run command, configuration an
 
 [Formal validation](formal/tla/validation.md) is complete. TLC checked two pilot models and nine configurations of the extended U/A/G model, including `U/VBC`. The checks produced four expected counterexamples and seven successful exhaustive searches. Twelve Python control traces include replays of the key transitions of all three extended counterexamples. The verification covers enforcement while G is active, the conditions for releasing G, the fact that it stays released, and budget safety during fallback under A. These results apply to the checked finite abstraction and selected Python traces.
 
-The external AgentBeats submission is complete (see below). The remaining stages are LLM annotation of the negotiations, the research report and the defense.
+The external AgentBeats submission is complete (see below). The negotiation annotation inputs and reviewer assignments are ready. LLM labeling and human verification are pending, followed by the research report and defense.
 
 ## External evaluation (AgentBeats)
 
@@ -102,8 +102,6 @@ uv run python -m project_d.evaluation.e5_analysis results/e5-6a5b6f70/deepseek-v
   results/test-32abf0e/e2/deepseek-v4-1-flash-1017/summary.csv --out results/e5-6a5b6f70/analysis
 # requests and journals of recorded episodes rebuilt through the current code
 uv run python -m project_d.experiments.replay_check results/test-32abf0e/e2/deepseek-v4-1-flash-1017
-# transcripts of the annotation sample in a scratch directory
-uv run python -m project_d.evaluation.annotation_sample results/test-32abf0e --out outputs/annotation
 ```
 
 The bootstrap uses 10 000 draws with seed 20261124, so the numbers reproduce exactly. To rerun a series itself (API key required), use the command in that series' README; for example, E2:
@@ -115,3 +113,20 @@ uv run python -m project_d.experiments.matrix E2 --allow-test --provider mistral
 ```
 
 Hosted weights cannot be pinned, so a rerun reproduces the procedure, not the exact model outputs. The saved journals are the record.
+
+## Qualitative negotiation analysis
+
+Run from the repository root. Give the annotating LLM one file from `llm/batches/size-10/` together with the rubric and schema. Save its response in `llm/responses/`. Import each returned batch by its actual filename.
+
+```bash
+uv run python -m project_d.evaluation.annotation_sample prepare
+uv run python -m project_d.evaluation.annotation_sample import results/test-32abf0e/annotation/llm/responses/batch-001.jsonl
+uv run python -m project_d.evaluation.annotation_sample status
+uv run python -m project_d.evaluation.annotation_sample verify
+# Review the individual sheets, then export unresolved disagreements if any.
+uv run python -m project_d.evaluation.annotation_sample merge
+# If needed, fill disagreements.csv and run merge again before final analysis.
+uv run python -m project_d.evaluation.annotation_analysis
+```
+
+The [annotation guide](results/test-32abf0e/annotation/README.md) describes edits, reconciliation and preliminary analysis.
