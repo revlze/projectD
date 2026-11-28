@@ -51,3 +51,14 @@ Purple configuration comes from the environment: `PURPLE_PROVIDER` (`mistral` by
 `agentbeats/amber/green.json5` and `agentbeats/amber/purple.json5` are the Amber component manifests used by the leaderboard repository's `scenario.json5`.
 
 Leaderboard repository: [revlze/project-d-agentbeats-leaderboard](https://github.com/revlze/project-d-agentbeats-leaderboard). The scenario there pins both images to `sha-6937a6d`. A local Amber rehearsal of that scenario ran through gateway v0.3 on four episodes against the live model and completed (`amber compile` + `docker compose`).
+
+## Submission of record
+
+| Item | Value |
+| --- | --- |
+| Green agent | [revlze/project-d-shared-budget-assessor](https://agentbeats.dev/revlze/project-d-shared-budget-assessor), id `01a22048-c3ac-76f2-a5db-6604b8f2375e` |
+| Baseline participant | [revlze/project-d-baseline-deepseek-v4-1-flash](https://agentbeats.dev/revlze/project-d-baseline-deepseek-v4-1-flash), id `01a2204a-e138-7133-9685-b69458c86831` |
+| Assessment run | https://github.com/revlze/project-d-agentbeats-leaderboard/actions/runs/46105296499 |
+| Results | [PR #1](https://github.com/revlze/project-d-agentbeats-leaderboard/pull/1), merged as `06bd0a5`; provenance pins both image digests |
+
+Default assessment: 112 episodes, 0 failed. Score 0.799 overall; A/F 0.981, A/VBC 0.976, U/F 0.679, U/VBC 0.563. Against E2 repeat 0 with the same model (0.958, 0.960, 0.745, 0.567), the violation outcome is identical in all 56 atomic episodes and in 44 of 56 unreserved ones; the remaining differences are within the stochasticity of a hosted model at temperature 0.3.
