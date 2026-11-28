@@ -49,3 +49,5 @@ Purple configuration comes from the environment: `PURPLE_PROVIDER` (`mistral` by
 `.github/workflows/agentbeats.yml` tests the code. It then builds `Dockerfile.agentbeats` twice for `linux/amd64` (`AGENT_ROLE=green|purple`) and starts each container. Each container must pass the A2A conformance tests of the official `green-agent-template` (pinned commit). Finally the workflow pushes `ghcr.io/revlze/project-d-green` and `ghcr.io/revlze/project-d-purple` with tags `sha-<commit>` and `latest`. The build itself fails if `data/scenarios` does not match its manifest.
 
 `agentbeats/amber/green.json5` and `agentbeats/amber/purple.json5` are the Amber component manifests used by the leaderboard repository's `scenario.json5`.
+
+Leaderboard repository: [revlze/project-d-agentbeats-leaderboard](https://github.com/revlze/project-d-agentbeats-leaderboard). The scenario there pins both images to `sha-6937a6d`. A local Amber rehearsal of that scenario ran through gateway v0.3 on four episodes against the live model and completed (`amber compile` + `docker compose`).
