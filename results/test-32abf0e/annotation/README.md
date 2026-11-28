@@ -1,6 +1,6 @@
 # Negotiation annotation - E2 and E5
 
-The infrastructure is ready. LLM labels and human verification are pending. The workflow uses LLM-assisted annotation with human verification.
+LLM-assisted annotation, human verification and reconciliation are complete. The final set contains 2,778 semantic labels across 213 episodes. Reviewers recorded 3,341 decisions and resolved 8 disagreements. Human verification changed 33 semantic labels. [Final CSVs](final/) · [Final analysis](analysis/final/)
 
 ## Frozen samples
 

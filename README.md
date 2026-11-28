@@ -71,7 +71,7 @@ Every series directory has a README with the exact run command, configuration an
 
 [Formal validation](formal/tla/validation.md) is complete. TLC checked two pilot models and nine configurations of the extended U/A/G model, including `U/VBC`. The checks produced four expected counterexamples and seven successful exhaustive searches. Twelve Python control traces include replays of the key transitions of all three extended counterexamples. The verification covers enforcement while G is active, the conditions for releasing G, the fact that it stays released, and budget safety during fallback under A. These results apply to the checked finite abstraction and selected Python traces.
 
-The external AgentBeats submission is complete (see below). The negotiation annotation inputs and reviewer assignments are ready. LLM labeling and human verification are pending, followed by the research report and defense.
+The external AgentBeats submission is complete (see below). Negotiation annotation, human verification and reconciliation are complete. The remaining milestones are the final research report, course submission and individual defense.
 
 ## External evaluation (AgentBeats)
 
@@ -115,6 +115,8 @@ uv run python -m project_d.experiments.matrix E2 --allow-test --provider mistral
 Hosted weights cannot be pinned, so a rerun reproduces the procedure, not the exact model outputs. The saved journals are the record.
 
 ## Qualitative negotiation analysis
+
+The completed analysis covers 213 episodes and 2,778 semantic labels. Reviewers recorded 3,341 decisions and resolved 8 disagreements. Human verification changed 33 semantic labels. The [final CSVs](results/test-32abf0e/annotation/final/) and [final analysis](results/test-32abf0e/annotation/analysis/final/) are available in the annotation directory.
 
 Run from the repository root. Give the annotating LLM one file from `llm/batches/size-10/` together with the rubric and schema. Save its response in `llm/responses/`. Import each returned batch by its actual filename.
 
