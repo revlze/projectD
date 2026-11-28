@@ -185,14 +185,12 @@ def test_ollama_profile_keeps_baseline_payload() -> None:
     assert config == LLMConfig(seed=3)
 
 
-def test_metadata_marks_main_and_secondary_calls() -> None:
+def test_mistral_metadata_marks_call_source_only() -> None:
     client = OpenAICompatibleClient(provider_config("mistral", LLMConfig()))
-    main = client.build_payload([{"role": "user", "content": "test"}], [])["metadata"]
-    followup = client.build_payload([{"role": "tool", "content": "test"}], [])["metadata"]
-    empty = client.build_payload([], [])["metadata"]
-    assert main == {"call_type": "main_call", "call_source": "vibe_code"}
-    assert followup == {"call_type": "secondary_call", "call_source": "vibe_code"}
-    assert empty == main
+    for messages in ([{"role": "user", "content": "test"}], [{"role": "tool", "content": "t"}], []):
+        assert client.build_payload(messages, [])["metadata"] == {"call_source": "vibe_code"}
+    local = OpenAICompatibleClient(provider_config("ollama", LLMConfig()))
+    assert "metadata" not in local.build_payload([{"role": "user", "content": "test"}], [])
 
 
 @pytest.mark.parametrize("provider", ("ollama", "mimo"))
