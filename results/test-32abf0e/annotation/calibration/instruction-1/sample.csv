@@ -1,0 +1,11 @@
+order,episode,series,variant,profile,repeat,samples
+1,E2__test_s1_01__A-F__r0,E2,A/F,test_s1_01,0,"[""original"",""target""]"
+2,E2__test_s1_01__U-R1__r0,E2,U/R1,test_s1_01,0,"[""original""]"
+3,E2__test_s1_01__A-R1__r0,E2,A/R1,test_s1_01,0,"[""original""]"
+4,E2__test_s1_01__U-R3__r0,E2,U/R3,test_s1_01,0,"[""original""]"
+5,E2__test_s1_01__A-R3P__r0,E2,A/R3P,test_s1_01,0,"[""original""]"
+6,E2__test_s1_01__A-VBC__r0,E2,A/VBC,test_s1_01,0,"[""original"",""target""]"
+7,E5__test_s1_01__A-VBC-F__r0,E5,A/VBC-F,test_s1_01,0,"[""exploratory_extension"",""target""]"
+8,E2__test_s2_01__U-F__r0,E2,U/F,test_s2_01,0,"[""original""]"
+9,E2__test_s3_01__A-R3__r0,E2,A/R3,test_s3_01,0,"[""original""]"
+10,E2__test_s4_01__U-R3P__r0,E2,U/R3P,test_s4_01,0,"[""original""]"

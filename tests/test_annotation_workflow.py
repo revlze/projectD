@@ -137,7 +137,7 @@ def _fixture(out: Path) -> dict:
             "episode": row["episode"],
             "samples": row["samples"],
             "schema_version": "1",
-            "instruction_version": "1",
+            "instruction_version": workflow.INSTRUCTION_VERSION,
             "manifest_sha256": data.digest(manifest.encode()),
             "catalog": {"A": [["qa", "full"]], "B": [["regression", "test"]]},
             "required": {
@@ -189,7 +189,7 @@ def _fixture(out: Path) -> dict:
         workflow.write(out / name, content)
     identity = {
         "schema_version": "1",
-        "instruction_version": "1",
+        "instruction_version": workflow.INSTRUCTION_VERSION,
         "manifest_sha256": data.digest(manifest.encode()),
         "schema_sha256": data.digest(files["schema.json"].encode()),
         "instruction_sha256": data.digest(files["rubric.md"].encode()),

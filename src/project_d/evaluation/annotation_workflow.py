@@ -28,7 +28,7 @@ from project_d.evaluation.annotation_data import (
 )
 
 SCHEMA_VERSION = "1"
-INSTRUCTION_VERSION = "1"
+INSTRUCTION_VERSION = "2"
 RATERS = ("seva", "platon")
 INTENTS = {"first_intent", "final_intent"}
 VALUES = ("yes", "no", "unclear", "not_applicable")

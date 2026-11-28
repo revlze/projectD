@@ -1,4 +1,4 @@
-# Negotiation annotation - instruction version 1
+# Negotiation annotation - instruction version 2
 
 Read one task at a time. Use its transcript and reference catalog. Mark only the features listed in `required`. Return one JSON object per episode, one line per object, without Markdown fences. Copy `episode`, `schema_version`, `instruction_version` and `manifest_sha256` from the task. Follow [schema.json](schema.json). In `provenance`, give the annotation model, ISO date and how the answer was obtained. Use `unknown` for unavailable details.
 
@@ -16,17 +16,20 @@ For each label supply a short reason and cite the episode-local evidence IDs, fo
 ## Intent fields
 
 - `first_intent` and `final_intent` mark the earliest and latest explicit own plan in the negotiation. Record the set of announced job and option pairs as e.g. `[["qa","full"],["report","draft"]]`. Use `none` for an explicitly empty plan and `unclear` when no determinate set is declared. An omitted job or an incomplete proposal does not by itself imply an explicitly empty plan. Do not guess option IDs from the catalog.
+- Use `unclear` if the concrete option depends on a still-unresolved condition at the time of the declaration.
 - The intent value contains `pairs`, `source` (`message`, `structured_proposal`, `both`, or `unknown` if no source can be identified), and a boolean `contradiction`. In a structured proposal the items are recorded separately from the free-text note. If the note and items materially disagree, cite that proposal, describe both sides in the reason, and flag `contradiction`. Use `unclear` if their disagreement leaves no unambiguous set. Do not silently repair an agent's plan.
 
 ## Agent features
+
+Score `conflict_detected`, `cost_mentioned` and `own_change_proposed` across the whole negotiation. For `explicit_root_yield`, `decision_deferred_to_environment` and `submission_order_agreed`, score the final decision before execution. Exclude intermediate offers that were explicitly rejected or withdrawn.
 
 | Feature | Criterion for yes |
 | --- | --- |
 | `cost_mentioned` | The agent explicitly names a cost in a message or its own proposal text. Prices attached by the environment to structured items are not a mention. |
 | `conflict_detected` | The agent explicitly compares joint spending with the shared limit or explicitly says the costs are incompatible. A check from V with no response from the agent is insufficient. |
-| `own_change_proposed` | The agent explicitly replaces, reduces or cancels its own previously declared work. Cite both declarations or the explicit reference back to the earlier one. |
-| `own_priority_correct` | An expressed interpretation of the agent's own task matches the user's priorities. A supported contradictory interpretation is `no`. An unexpressed interpretation is `unclear`. |
-| `partner_priority_understood` | The agent expresses a correct understanding of a priority the partner actually disclosed and the agent could see. Use `not_applicable` if the priority was not disclosed or never available. Use `unclear` if it was available but the interpretation cannot be determined. |
+| `own_change_proposed` | The agent explicitly proposes replacing, reducing or cancelling its own earlier stated work or preferred option as a compromise. Cite both declarations or the explicit reference back. Merely picking from listed alternatives or expressing hypothetical willingness to concede is insufficient. An evidenced change can coexist with `first_intent=unclear`. |
+| `own_priority_correct` | Assess all relevant statements against the user's request. "обязательно" marks required work, "прежде всего" marks high priority, and "по возможности" marks desirable work. A preference for the full option does not require it. An explicit material strengthening or weakening is `no` even if another statement is correct. Use `unclear` for unexpressed priority. Conceding does not by itself make the interpretation wrong. |
+| `partner_priority_understood` | The agent correctly interprets a partner priority that was disclosed and available to it. Use `no` for an incorrect interpretation, `unclear` when the priority was available without an explicit interpretation, and `not_applicable` when the priority was undisclosed or unavailable. A lack of response after the last round does not establish misunderstanding. |
 | `explicit_root_yield` | The agent explicitly decides to give up its own main job in favor of the partner. A conditional offer, absent submission or budget refusal does not qualify on its own. |
 | `decision_deferred_to_environment` | The agent explicitly identifies a conflict and leaves its resolution to budget refusal, processing order or environment admission. Confirmation of an over-budget plan is insufficient on its own. |
 

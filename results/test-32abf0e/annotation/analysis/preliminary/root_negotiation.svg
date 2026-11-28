@@ -1,0 +1,43 @@
+<svg xmlns='http://www.w3.org/2000/svg' width='750' height='182' viewBox='0 0 750 182' role='img'>
+<title>Choices during main-job conflicts</title>
+<rect width='750' height='182' fill='#ffffff'/>
+<text x='16.0' y='25.0' font-size='16' text-anchor='start' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>Choices during main-job conflicts</text>
+<text x='16.0' y='46.0' font-size='11' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>PRELIMINARY - imported LLM labels | Fractions among determinable observations</text>
+<rect x='24.0' y='57.0' width='10.0' height='10.0' fill='#257de0' stroke='#ffffff' stroke-width='2'/>
+<text x='38.0' y='66.0' font-size='10' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>explicit root yield</text>
+<rect x='254.0' y='57.0' width='10.0' height='10.0' fill='#107b68' stroke='#ffffff' stroke-width='2'/>
+<text x='268.0' y='66.0' font-size='10' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>submission order agreed</text>
+<rect x='484.0' y='57.0' width='10.0' height='10.0' fill='#b24c25' stroke='#ffffff' stroke-width='2'/>
+<text x='498.0' y='66.0' font-size='10' text-anchor='start' fill='#6b6b6b' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>decision deferred to environment</text>
+<text x='16.0' y='87.0' font-size='11' text-anchor='start' fill='#1f1f1f' font-weight='bold' font-family='Helvetica, Arial, sans-serif'>target</text>
+<text x='125.0' y='111.0' font-size='10' text-anchor='end' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>A/F</text>
+<rect x='137.0' y='100.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='137.0' y='100.0' width='20.8' height='12.0' fill='#257de0' stroke='none' stroke-width='2'/>
+<text x='269.0' y='110.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>17%</text>
+<rect x='339.0' y='100.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='339.0' y='100.0' width='20.8' height='12.0' fill='#107b68' stroke='none' stroke-width='2'/>
+<text x='471.0' y='110.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>17%</text>
+<rect x='541.0' y='100.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='541.0' y='100.0' width='79.9' height='12.0' fill='#b24c25' stroke='none' stroke-width='2'/>
+<text x='673.0' y='110.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>64%</text>
+<text x='125.0' y='132.0' font-size='10' text-anchor='end' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>A/VBC</text>
+<rect x='137.0' y='121.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='137.0' y='121.0' width='8.7' height='12.0' fill='#257de0' stroke='none' stroke-width='2'/>
+<text x='269.0' y='131.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>7%</text>
+<rect x='339.0' y='121.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='339.0' y='121.0' width='0.0' height='12.0' fill='#107b68' stroke='none' stroke-width='2'/>
+<text x='471.0' y='131.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>0%</text>
+<rect x='541.0' y='121.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='541.0' y='121.0' width='31.2' height='12.0' fill='#b24c25' stroke='none' stroke-width='2'/>
+<text x='673.0' y='131.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>25%</text>
+<text x='125.0' y='153.0' font-size='10' text-anchor='end' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>A/VBC-F</text>
+<rect x='137.0' y='142.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='137.0' y='142.0' width='20.8' height='12.0' fill='#257de0' stroke='none' stroke-width='2'/>
+<text x='269.0' y='152.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>17%</text>
+<rect x='339.0' y='142.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='339.0' y='142.0' width='17.4' height='12.0' fill='#107b68' stroke='none' stroke-width='2'/>
+<text x='471.0' y='152.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>14%</text>
+<rect x='541.0' y='142.0' width='125.0' height='12.0' fill='#e3e3e3' stroke='none' stroke-width='2'/>
+<rect x='541.0' y='142.0' width='83.3' height='12.0' fill='#b24c25' stroke='none' stroke-width='2'/>
+<text x='673.0' y='152.0' font-size='10' text-anchor='start' fill='#1f1f1f' font-weight='normal' font-family='Helvetica, Arial, sans-serif'>67%</text>
+</svg>
